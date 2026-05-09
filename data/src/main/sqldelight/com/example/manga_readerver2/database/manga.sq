@@ -1,0 +1,82 @@
+CREATE TABLE manga (
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    source INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    artist TEXT,
+    author TEXT,
+    description TEXT,
+    genre TEXT,
+    title TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    thumbnail_url TEXT,
+    favorite INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    last_update INTEGER DEFAULT 0,
+    initialized INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    viewer INTEGER NOT NULL DEFAULT 0,
+    chapter_flags INTEGER NOT NULL DEFAULT 0,
+    cover_last_modified INTEGER DEFAULT 0,
+    date_added INTEGER DEFAULT 0,
+    UNIQUE(source, url)
+);
+
+CREATE INDEX manga_url_index ON manga(url);
+CREATE INDEX manga_favorite_index ON manga(favorite) WHERE favorite = 1;
+
+insertManga:
+INSERT OR IGNORE INTO manga(source, url, artist, author, description, genre, title, status, thumbnail_url, favorite, last_update, initialized, viewer, chapter_flags, cover_last_modified, date_added)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getMangaById:
+SELECT * FROM manga WHERE _id = ?;
+
+getMangaByUrlAndSource:
+SELECT * FROM manga WHERE url = ? AND source = ?;
+
+getFavorites:
+SELECT * FROM manga WHERE favorite = 1;
+
+updateManga:
+UPDATE manga SET
+    source = ?,
+    url = ?,
+    artist = ?,
+    author = ?,
+    description = ?,
+    genre = ?,
+    title = ?,
+    status = ?,
+    thumbnail_url = ?,
+    favorite = ?,
+    last_update = ?,
+    initialized = ?,
+    viewer = ?,
+    chapter_flags = ?,
+    cover_last_modified = ?
+WHERE _id = ?;
+
+updateMangaDetails:
+UPDATE manga SET
+    artist = ?,
+    author = ?,
+    description = ?,
+    genre = ?,
+    status = ?,
+    initialized = ?
+WHERE _id = ?;
+
+updateMangaFavorite:
+UPDATE manga SET
+    favorite = ?
+WHERE _id = ?;
+
+deleteManga:
+DELETE FROM manga WHERE _id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+getLibraryWithUnread:
+SELECT manga.*, 
+       (SELECT COUNT(*) FROM chapters WHERE chapters.manga_id = manga._id AND chapters.read = 0) AS unread_count
+FROM manga
+WHERE manga.favorite = 1;

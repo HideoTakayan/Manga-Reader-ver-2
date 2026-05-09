@@ -1,0 +1,46 @@
+CREATE TABLE categories (
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    sort_index INTEGER NOT NULL,
+    flags INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE manga_categories (
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    manga_id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    FOREIGN KEY(manga_id) REFERENCES manga(_id) ON DELETE CASCADE,
+    FOREIGN KEY(category_id) REFERENCES categories(_id) ON DELETE CASCADE
+);
+
+getCategories:
+SELECT * FROM categories ORDER BY sort_index;
+
+insertCategory:
+INSERT INTO categories(name, sort_index)
+VALUES (?, ?);
+
+deleteCategory:
+DELETE FROM categories WHERE _id = ?;
+
+updateCategory:
+UPDATE categories SET name = ?, sort_index = ? WHERE _id = ?;
+
+getMangasInCategory:
+SELECT m.*
+FROM manga m
+JOIN manga_categories mc ON m._id = mc.manga_id
+WHERE mc.category_id = ?;
+
+addMangaToCategory:
+INSERT INTO manga_categories(manga_id, category_id)
+VALUES (?, ?);
+
+removeMangaFromCategory:
+DELETE FROM manga_categories WHERE manga_id = ? AND category_id = ?;
+
+removeAllCategoriesFromManga:
+DELETE FROM manga_categories WHERE manga_id = ?;
+
+getMangaCategoryIds:
+SELECT category_id FROM manga_categories WHERE manga_id = ?;

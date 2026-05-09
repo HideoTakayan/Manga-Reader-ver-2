@@ -1,0 +1,43 @@
+CREATE TABLE history (
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    chapter_id INTEGER NOT NULL,
+    last_read INTEGER NOT NULL DEFAULT 0,
+    time_read INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(chapter_id),
+    FOREIGN KEY(chapter_id) REFERENCES chapters(_id) ON DELETE CASCADE
+);
+
+CREATE INDEX history_chapter_id_index ON history(chapter_id);
+
+getHistory:
+SELECT
+    m.title AS mTitle,
+    c.name AS cName,
+    h.last_read AS lRead,
+    h.time_read AS tRead,
+    m.thumbnail_url AS tUrl,
+    m._id AS mId,
+    c._id AS cId
+FROM history h
+JOIN chapters c ON h.chapter_id = c._id
+JOIN manga m ON c.manga_id = m._id
+WHERE h.last_read = (
+    SELECT MAX(h2.last_read)
+    FROM history h2
+    JOIN chapters c2 ON h2.chapter_id = c2._id
+    WHERE c2.manga_id = m._id
+)
+ORDER BY h.last_read DESC;
+
+getTotalTimeRead:
+SELECT SUM(time_read) FROM history;
+
+upsertHistory:
+INSERT INTO history(chapter_id, last_read, time_read)
+VALUES (?, ?, ?)
+ON CONFLICT(chapter_id) DO UPDATE SET
+    last_read = excluded.last_read,
+    time_read = time_read + excluded.time_read;
+
+deleteAllHistory:
+DELETE FROM history;

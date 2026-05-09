@@ -1,0 +1,65 @@
+CREATE TABLE chapters (
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    manga_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    name TEXT NOT NULL,
+    scanlator TEXT,
+    read INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    bookmark INTEGER AS kotlin.Boolean NOT NULL DEFAULT 0,
+    last_page_read INTEGER NOT NULL DEFAULT 0,
+    chapter_number REAL AS kotlin.Float NOT NULL DEFAULT -1,
+    source_order INTEGER NOT NULL DEFAULT -1,
+    date_fetch INTEGER NOT NULL DEFAULT 0,
+    date_upload INTEGER NOT NULL DEFAULT 0,
+    last_modified_at INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(manga_id, url),
+    FOREIGN KEY(manga_id) REFERENCES manga(_id) ON DELETE CASCADE
+);
+
+CREATE INDEX chapters_manga_id_index ON chapters(manga_id);
+CREATE INDEX chapters_unread_by_manga_index ON chapters(manga_id, read) WHERE read = 0;
+
+getChaptersByMangaId:
+SELECT * FROM chapters WHERE manga_id = ? ORDER BY source_order DESC;
+
+insertChapter:
+INSERT OR IGNORE INTO chapters(manga_id, url, name, scanlator, read, bookmark, last_page_read, chapter_number, source_order, date_fetch, date_upload, last_modified_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateChapterMetadata:
+UPDATE chapters SET
+    name = ?,
+    scanlator = ?,
+    chapter_number = ?,
+    source_order = ?,
+    date_upload = ?,
+    last_modified_at = ?
+WHERE manga_id = ? AND url = ?;
+
+updateChapter:
+UPDATE chapters SET
+    read = ?,
+    bookmark = ?,
+    last_page_read = ?
+WHERE _id = ?;
+ 
+updateChapterReadStatusByUrl:
+UPDATE chapters SET
+    read = ?,
+    bookmark = ?,
+    last_page_read = ?
+WHERE manga_id = ? AND url = ?;
+
+deleteChaptersByMangaId:
+DELETE FROM chapters WHERE manga_id = ?;
+
+getUpdates:
+SELECT chapters.*, manga.title AS mangaTitle, manga.thumbnail_url AS mangaThumbnail
+FROM chapters
+JOIN manga ON manga._id = chapters.manga_id
+WHERE manga.favorite = 1 AND chapters.date_upload > 0
+ORDER BY chapters.date_upload DESC
+LIMIT 50;
+
+getTotalReadChapters:
+SELECT COUNT(*) FROM chapters WHERE read = 1;
