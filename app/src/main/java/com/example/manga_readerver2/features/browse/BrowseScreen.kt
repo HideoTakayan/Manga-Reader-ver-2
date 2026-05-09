@@ -425,6 +425,21 @@ fun SourcesTab(
             contentPadding = PaddingValues(bottom = 16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
+            if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0) {
+                item(key = "hidden_hint") {
+                    val reasons = buildList {
+                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount bị ẩn theo ngôn ngữ")
+                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount bị ẩn theo loại nội dung")
+                    }.joinToString(" • ")
+                    Text(
+                        text = "Đang ẩn: $reasons",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
             if (pinnedList.isNotEmpty()) {
                 item(key = "header_pinned") {
                     Text(
