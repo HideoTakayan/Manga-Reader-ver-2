@@ -96,11 +96,18 @@ class BrowseScreenModel(
                     put(extension.pkgName, step)
                 }
                 
-                // Nếu cài đặt thành công (với JS hoặc Internal APK), load lại list local
-                if (step == InstallStep.Installed || step == InstallStep.SystemInstallStarted) {
+                // Chỉ reload ngay khi đã cài xong thật sự (JS/Internal APK).
+                // Với SystemInstallStarted, chờ package broadcast hoặc onScreenResumed().
+                if (step == InstallStep.Installed) {
                     extensionManager.loadLocalExtensions()
                 }
             }
+        }
+    }
+
+    fun onScreenResumed() {
+        screenModelScope.launch {
+            extensionManager.loadLocalExtensions()
         }
     }
 

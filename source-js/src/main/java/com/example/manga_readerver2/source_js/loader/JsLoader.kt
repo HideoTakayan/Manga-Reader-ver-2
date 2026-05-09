@@ -66,14 +66,19 @@ object JsLoader {
             readScript(config.script.toc, "toc")
             readScript(config.script.chap, "chap")
 
-            // Normalize locale: "vi_VN" -> "vi", "en_US" -> "en", "global" -> "all"
-            // Phải khớp với ExtensionApi.lang formula
-            val rawLocale = config.metadata.locale ?: "all"
-            val lang = when {
-                rawLocale == "global" -> "all"
-                rawLocale.contains("_") -> rawLocale.substringBefore("_")
-                else -> rawLocale
+            fun normalizeLang(code: String?): String {
+                if (code.isNullOrBlank()) return "all"
+                val normalized = code.trim().lowercase()
+                return when {
+                    normalized == "global" -> "all"
+                    normalized.contains("_") -> normalized.substringBefore("_")
+                    normalized.contains("-") -> normalized.substringBefore("-")
+                    else -> normalized
+                }
             }
+
+            // Ưu tiên locale, fallback language, cuối cùng là all.
+            val lang = normalizeLang(config.metadata.locale ?: config.metadata.language)
 
             // Fix: ID phải khớp với ExtensionApi.sourceId formula
             // Dùng cùng offset 0x5642000000000000L ("VB" in hex) và cùng input hash

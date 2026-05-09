@@ -59,7 +59,7 @@ class ExtensionApi(
                     // pluginId là tên thư mục trong URL: bachngocsach, truyenfull, v.v.
                     val pluginId = folderUrl.substringAfterLast("/")
 
-                    val lang = item.locale?.substringBefore("_") ?: "vi"
+                    val lang = normalizeLang(item.locale ?: item.language)
 
                     // ID phải khớp với JsLoader.sourceId formula
                     val sourceId = 0x5642000000000000L or
@@ -97,6 +97,17 @@ class ExtensionApi(
                 logcat(LogPriority.ERROR) { "Lỗi khi nạp repo từ $repoUrl: ${e.message}" }
                 emptyList()
             }
+        }
+    }
+
+    private fun normalizeLang(code: String?): String {
+        if (code.isNullOrBlank()) return "all"
+        val normalized = code.trim().lowercase()
+        return when {
+            normalized == "global" -> "all"
+            normalized.contains("_") -> normalized.substringBefore("_")
+            normalized.contains("-") -> normalized.substringBefore("-")
+            else -> normalized
         }
     }
 
@@ -215,6 +226,7 @@ private data class VBookItemObject(
     val icon: String? = null,
     val type: String? = null,
     val locale: String? = null,
+    val language: String? = null,
     val tag: String? = null,
     val description: String? = null
 )
