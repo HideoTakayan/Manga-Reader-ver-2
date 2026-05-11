@@ -387,9 +387,6 @@ fun SourcesTab(
         }
     }
 
-        }
-    }
-
     val normalizedEnabledLangs = enabledLangs.map { normalizeLang(it) }.toSet()
     val sourceWithExt = extensions.flatMap { ext -> ext.sources.map { source -> source to ext } }
 
