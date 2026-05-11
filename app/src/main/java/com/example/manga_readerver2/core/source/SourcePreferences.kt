@@ -7,7 +7,7 @@ import com.example.manga_readerver2.core.utils.PreferenceStore
  */
 class SourcePreferences(preferenceStore: PreferenceStore) {
 
-    val enabledLanguages = preferenceStore.getStringSet("source_languages", setOf("vi", "en"))
+    val enabledLanguages = preferenceStore.getStringSet("source_languages", setOf("all"))
     
     val extensionUpdatesCount = preferenceStore.getInt("ext_updates_count", 0)
 

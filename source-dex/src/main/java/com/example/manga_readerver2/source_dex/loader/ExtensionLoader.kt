@@ -226,12 +226,14 @@ object ExtensionLoader {
             return LoadResult.Error
         }
 
-        // Fix: Đồng bộ với Mihon — đọc từ METADATA_SOURCE_CLASS, split bằng ";", hỗ trợ relative class name
+        // Hỗ trợ cả 2 key metadata vì một số extension chỉ khai báo factory.
         val sourceClassRaw = metaData?.getString(METADATA_SOURCE_CLASS)
             ?: metaData?.getString(METADATA_SOURCE_FACTORY)
-            
         if (sourceClassRaw.isNullOrBlank()) {
-            logcat(LogPriority.ERROR) { "Extension $pkgName thiếu metadata source class/factory" }
+            logcat(LogPriority.ERROR) {
+                "Extension $pkgName thiếu metadata '${METADATA_SOURCE_CLASS}' hoặc '${METADATA_SOURCE_FACTORY}'"
+            }
+
             return LoadResult.Error
         }
 
@@ -293,6 +295,7 @@ object ExtensionLoader {
                pkgName.startsWith("mihon.extension.") ||
                pkgName.startsWith("com.example.manga_readerver2.extension.") ||
                pkgName.contains(".extension.") // Fallback broad match
+
     }
 
     private fun getSignatures(pkgInfo: PackageInfo): List<String> {

@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -43,6 +46,7 @@ class BrowseScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val rootNavigator = navigator.parent ?: navigator
         val screenModel = rememberScreenModel { BrowseScreenModel() }
+        val lifecycleOwner = LocalLifecycleOwner.current
         val installedExts by screenModel.installedExtensions.collectAsState()
         val untrustedExts by screenModel.untrustedExtensions.collectAsState()
         val availableExts by screenModel.availableExtensions.collectAsState()
@@ -92,6 +96,18 @@ class BrowseScreen : Screen {
 
         val snackbarHostState = remember { SnackbarHostState() }
 
+        DisposableEffect(lifecycleOwner, screenModel) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    screenModel.onScreenResumed()
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+
         if (isSearching) {
             BackHandler {
                 isSearching = false
@@ -101,17 +117,25 @@ class BrowseScreen : Screen {
         
         val processedInstallSteps = remember { mutableSetOf<String>() }
         
-        // Fix: Theo dõi trạng thái cài đặt hệ thống để thông báo cho người dùng
         LaunchedEffect(installSteps) {
             installSteps.forEach { (pkg, step) ->
-                if (step == InstallStep.SystemInstallStarted && !processedInstallSteps.contains(pkg)) {
-                    processedInstallSteps.add(pkg)
-                    snackbarHostState.showSnackbar(
-                        message = "Vui lòng hoàn tất cài đặt trong hộp thoại hệ thống",
-                        duration = SnackbarDuration.Short
-                    )
-                } else if (step == InstallStep.Installed || step == InstallStep.Error) {
-                    // Nếu đã cài xong hoặc lỗi, có thể bỏ qua
+                if (!processedInstallSteps.contains(pkg + step.name)) {
+                    processedInstallSteps.add(pkg + step.name)
+                    when (step) {
+                        InstallStep.SystemInstallStarted -> snackbarHostState.showSnackbar(
+                            message = "Vui lòng hoàn tất cài đặt trong hộp thoại hệ thống",
+                            duration = SnackbarDuration.Short
+                        )
+                        InstallStep.Installed -> snackbarHostState.showSnackbar(
+                            message = "Đã cài đặt — chuyển sang tab Nguồn để sử dụng",
+                            duration = SnackbarDuration.Short
+                        )
+                        InstallStep.Error -> snackbarHostState.showSnackbar(
+                            message = "Cài đặt thất bại — kiểm tra logcat để biết chi tiết",
+                            duration = SnackbarDuration.Long
+                        )
+                        else -> {}
+                    }
                 }
             }
         }
@@ -363,20 +387,29 @@ fun SourcesTab(
         }
     }
 
-    val filteredExts = extensions.filter { ext ->
-        // ext.lang == "all" luôn hiện (đa ngôn ngữ), không phụ thuộc filter
-        val matchLang = ext.lang == "all" || enabledLangs.contains("all") || enabledLangs.contains(ext.lang)
-        val matchType = when (filter) {
-            1 -> !ext.isVBook
-            2 -> ext.isVBook
-            else -> true
         }
-        matchLang && matchType
     }
-    
-    val allSources = filteredExts.flatMap { ext -> 
-        ext.sources.map { source -> source to ext } 
+
+    val normalizedEnabledLangs = enabledLangs.map { normalizeLang(it) }.toSet()
+    val sourceWithExt = extensions.flatMap { ext -> ext.sources.map { source -> source to ext } }
+
+    fun matchType(ext: Extension.Installed): Boolean = when (filter) {
+        1 -> !ext.isVBook
+        2 -> ext.isVBook
+        else -> true
     }
+
+    fun matchLang(ext: Extension.Installed): Boolean {
+        val extLang = normalizeLang(ext.lang)
+        return extLang == "all" || normalizedEnabledLangs.contains("all") || normalizedEnabledLangs.contains(extLang)
+    }
+
+    val allSources = sourceWithExt.filter { (_, ext) ->
+        matchType(ext) && matchLang(ext)
+    }
+
+    val hiddenByTypeCount = sourceWithExt.count { (_, ext) -> !matchType(ext) }
+    val hiddenByLanguageCount = sourceWithExt.count { (_, ext) -> matchType(ext) && !matchLang(ext) }
 
     val pinnedList = allSources.filter { pinnedSources.contains(it.first.id.toString()) }
     val unpinnedGrouped = allSources
@@ -386,13 +419,42 @@ fun SourcesTab(
 
     if (allSources.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Chưa có nguồn nào phù hợp", color = Color.Gray)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Chưa có nguồn nào phù hợp", color = Color.Gray)
+                if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val reasons = buildList {
+                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount nguồn bị ẩn theo ngôn ngữ")
+                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount nguồn bị ẩn theo loại nội dung")
+                    }.joinToString(" • ")
+                    Text(
+                        text = reasons,
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+            }
         }
     } else {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
+            if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0) {
+                item(key = "hidden_hint") {
+                    val reasons = buildList {
+                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount bị ẩn theo ngôn ngữ")
+                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount bị ẩn theo loại nội dung")
+                    }.joinToString(" • ")
+                    Text(
+                        text = "Đang ẩn: $reasons",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
             if (pinnedList.isNotEmpty()) {
                 item(key = "header_pinned") {
                     Text(
@@ -565,13 +627,20 @@ fun ExtensionsTab(
     ) {
         if (filteredUntrusted.isNotEmpty()) {
             item(key = "header_untrusted") {
-                Text(
-                    "CHƯA TIN CẬY (${filteredUntrusted.size})", 
-                    color = Color.Red, 
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                )
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(
+                        "CHƯA TIN CẬY (${filteredUntrusted.size})",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Nhấn TIN CẬY để nguồn APK xuất hiện trong tab Nguồn.",
+                        color = Color.Yellow,
+                        fontSize = 12.sp
+                    )
+                }
             }
             items(filteredUntrusted, key = { "untrusted_${it.pkgName}" }) { ext ->
                 ExtensionItem(

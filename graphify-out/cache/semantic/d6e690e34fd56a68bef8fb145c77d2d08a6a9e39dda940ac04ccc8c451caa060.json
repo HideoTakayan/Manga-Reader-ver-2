@@ -1,0 +1,1 @@
+{"nodes": [{"id": "sourceapi_ProgressListener", "label": "ProgressListener Interface", "file_type": "code", "source_file": "source-api/src/main/java/eu/kanade/tachiyomi/network/ProgressListener.kt", "source_location": "line 3", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

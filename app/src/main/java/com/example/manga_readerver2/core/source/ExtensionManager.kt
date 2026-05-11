@@ -98,7 +98,7 @@ class ExtensionManager(
                         else -> {}
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 logcat(LogPriority.ERROR) { "Error loading APK extensions: ${e.message}" }
             }
 
@@ -113,7 +113,7 @@ class ExtensionManager(
                             val iconFile = File(pluginDir, "icon.png")
                             val iconDrawable = if (iconFile.exists()) {
                                 android.graphics.drawable.BitmapDrawable(
-                                    context.resources, 
+                                    context.resources,
                                     android.graphics.BitmapFactory.decodeFile(iconFile.absolutePath)
                                 )
                             } else null
@@ -130,30 +130,37 @@ class ExtensionManager(
                                 sources = listOf(source),
                                 icon = iconDrawable,
                                 isShared = false,
-                                // isVBook = true cho cả novel lẫn comic VBook (đều dùng JS engine)
-                                // UI sẽ phân biệt novel/comic qua info.isNovel
                                 isVBook = true,
                                 author = info.author
                             )
                             loadedExtensions.add(vbookExt)
                             loadedSources.add(source)
                         }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         logcat(LogPriority.ERROR) { "Error loading JS extension ${pluginDir.name}: ${e.message}\n${e.stackTraceToString()}" }
+
                     }
                 }
             }
 
-            // Fix: close các VBookEngine cũ trước khi thay thế list — tránh leak native QuickJS heap
-            _installedExtensions.value.forEach { ext ->
-                ext.sources.filterIsInstance<com.example.manga_readerver2.source_js.JsSource>()
-                    .forEach { jsSource -> jsSource.closeEngine() }
-            }
+            // Snapshot list cũ trước khi update StateFlow.
+            // Phải update StateFlow TRƯỚC khi close engine — nếu close throw thì StateFlow vẫn được cập nhật.
+            val oldExtensions = _installedExtensions.value
 
             _installedExtensions.value = loadedExtensions
             _untrustedExtensions.value = untrustedExtensions
             _sources.value = loadedSources
             logcat { "Loaded ${loadedSources.size} sources from ${loadedExtensions.size} extensions." }
+
+            // Đóng engine cũ sau khi StateFlow đã được cập nhật để tránh leak native QuickJS heap
+            oldExtensions.forEach { ext ->
+                ext.sources.filterIsInstance<com.example.manga_readerver2.source_js.JsSource>()
+                    .forEach { jsSource ->
+                        try { jsSource.closeEngine() } catch (e: Throwable) {
+                            logcat(LogPriority.WARN) { "Failed to close JS engine: ${e.message}" }
+                        }
+                    }
+            }
         }
     }
 

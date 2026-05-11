@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(not exist *)",
+      "Bash(dir /s /b \"*.kt\")",
+      "Bash(findstr /i \"extension\")"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "contextplus"
+  ]
+}
