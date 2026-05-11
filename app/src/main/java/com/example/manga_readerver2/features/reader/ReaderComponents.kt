@@ -13,8 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -99,16 +97,16 @@ fun PageImage(
     page: ReaderPage?,
     screenModel: ReaderScreenModel,
     scaleMode: Int = 0,
-    fillWidth: Boolean = false,
+    isWebtoon: Boolean = false,
     onTap: ((Float, Float, Float) -> Unit)? = null
 ) {
+    val currentOnTap = rememberUpdatedState(onTap)
     val model by produceState<Any?>(null, page) {
         value = withContext(Dispatchers.IO) {
             when (page) {
                 is ReaderPage.Local   -> page.file.absolutePath
                 is ReaderPage.Archive -> screenModel.getPageBytes(page)
                 is ReaderPage.Pdf     -> screenModel.renderPdfPage(page)
-                // Online: ưu tiên localFile đã download; fallback về URL cho Coil tự load
                 is ReaderPage.Online  -> page.localFile ?: page.url.takeIf { it.isNotEmpty() }
                 else -> null
             }
@@ -117,24 +115,23 @@ fun PageImage(
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
-            // Online đang loading
             page is ReaderPage.Online && page.isLoading -> {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(color = PrimaryOrange, modifier = Modifier.size(32.dp))
                     Text("Trang ${page.index + 1}", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
                 }
             }
-            // Đã có model để hiển
             model != null -> {
                 com.example.manga_readerver2.features.reader.components.SubsamplingImage(
                     model!!,
-                    modifier = if (fillWidth) Modifier.fillMaxWidth().wrapContentHeight() else Modifier.fillMaxSize(),
-                    scaleMode = if (fillWidth) 1 else scaleMode, // 1: Fit Width cho chế độ dọc
-                    isVertical = fillWidth,
-                    onTap = onTap
+                    modifier = if (isWebtoon) Modifier.fillMaxWidth().wrapContentHeight() else Modifier.fillMaxSize(),
+                    scaleMode = if (isWebtoon) 1 else scaleMode, 
+                    isWebtoon = isWebtoon,
+                    onTap = { x, y, w ->
+                        currentOnTap.value?.invoke(x, y, w)
+                    }
                 )
             }
-            // Đang load model
             else -> {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(color = PrimaryOrange, modifier = Modifier.size(32.dp))
@@ -152,21 +149,22 @@ fun ReaderPageContent(
     page: ReaderPage?,
     screenModel: ReaderScreenModel,
     scaleMode: Int = 0,
-    fillWidth: Boolean = false,
+    isWebtoon: Boolean = false,
     textColor: Color = Color.White,
     onTap: ((Float, Float, Float) -> Unit)? = null,
     listState: androidx.compose.foundation.lazy.LazyListState? = null
 ) {
+    val currentOnTap = rememberUpdatedState(onTap)
     if (page is ReaderPage.Text) {
         Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
             detectTapGestures { offset ->
-                onTap?.invoke(offset.x, offset.y, size.width.toFloat())
+                currentOnTap.value?.invoke(offset.x, offset.y, size.width.toFloat())
             }
         }) {
             TextReaderContent(page.content, listState = listState, screenModel = screenModel, textColor = textColor)
         }
     } else {
-        PageImage(page, screenModel, scaleMode, fillWidth, onTap)
+        PageImage(page, screenModel, scaleMode, isWebtoon, onTap)
     }
 }
 

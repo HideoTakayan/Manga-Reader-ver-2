@@ -132,6 +132,7 @@ dependencies {
 
     // Jsoup (HTML processing for EPUB)
     implementation(libs.jsoup)
+    implementation(libs.androidx.viewpager2)
 
     // Tests
     testImplementation(libs.junit)

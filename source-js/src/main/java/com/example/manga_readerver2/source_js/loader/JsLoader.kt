@@ -102,7 +102,7 @@ object JsLoader {
                 isNovel = config.metadata.type == "novel"
             )
         } catch (e: Exception) {
-            logcat(LogPriority.ERROR) { "Failed to load JS extension from ${pluginDir.absolutePath}: ${e.message}" }
+            logcat(LogPriority.ERROR) { "Failed to load JS extension from ${pluginDir.absolutePath}: ${e.message}\n${e.stackTraceToString()}" }
             null
         }
     }

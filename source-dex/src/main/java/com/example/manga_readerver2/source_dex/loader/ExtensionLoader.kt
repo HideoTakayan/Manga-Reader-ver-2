@@ -29,7 +29,7 @@ import java.io.File
 object ExtensionLoader {
 
     const val LIB_VERSION_MIN = 1.4
-    const val LIB_VERSION_MAX = 1.6
+    const val LIB_VERSION_MAX = 2.0
 
     // Metadata keys chuẩn Mihon
     private const val METADATA_SOURCE_CLASS = "tachiyomi.extension.class"
@@ -44,13 +44,77 @@ object ExtensionLoader {
             PackageManager.GET_SIGNATURES or
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES else 0)
 
+    // Mihon compatibility: Parse lib version from version name if not in metadata
+    private fun parseLibVersion(versionName: String): Double {
+        if (versionName.isEmpty()) return 1.5
+        val parts = versionName.split(".")
+        return if (parts.size >= 2) {
+            "${parts[0]}.${parts[1]}".toDoubleOrNull() ?: 1.5
+        } else {
+            versionName.toDoubleOrNull() ?: 1.5
+        }
+    }
+
     fun loadExtensions(context: Context, trustedSignatures: Set<String>): List<LoadResult> {
         val pkgManager = context.packageManager
         
-        val installedPkgs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            pkgManager.getInstalledPackages(PackageManager.PackageInfoFlags.of(PACKAGE_FLAGS.toLong()))
-        } else {
-            pkgManager.getInstalledPackages(PACKAGE_FLAGS)
+        val installedPkgs = mutableListOf<PackageInfo>()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val flags = PackageManager.PackageInfoFlags.of(PACKAGE_FLAGS.toLong())
+                installedPkgs.addAll(pkgManager.getInstalledPackages(flags))
+            } else {
+                @Suppress("DEPRECATION")
+                installedPkgs.addAll(pkgManager.getInstalledPackages(PACKAGE_FLAGS))
+            }
+            
+            // Cách 2: Quét qua Intent (chắc chắn hơn cho extension) - Quét cả Activity, Service và Receiver
+            val extensionActions = listOf(
+                "tachiyomi.extension",
+                "eu.kanade.tachiyomi.extension.ACTION_LOAD",
+                "tachiyomi.extension.ACTION_LOAD",
+                "mihon.extension.ACTION_LOAD"
+            )
+            
+            extensionActions.forEach { action ->
+                val intent = Intent(action)
+                // Thu thập pkgName từ 3 nguồn: Activities, Services, Receivers
+                val pkgNames = mutableSetOf<String>()
+                
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val flags = PackageManager.ResolveInfoFlags.of(PackageManager.GET_META_DATA.toLong())
+                    pkgNames.addAll(pkgManager.queryIntentActivities(intent, flags).map { res -> res.activityInfo.packageName })
+                    pkgNames.addAll(pkgManager.queryIntentServices(intent, flags).map { res -> res.serviceInfo.packageName })
+                    pkgNames.addAll(pkgManager.queryBroadcastReceivers(intent, flags).map { res -> res.activityInfo.packageName })
+                } else {
+                    val flags = PackageManager.GET_META_DATA
+                    @Suppress("DEPRECATION")
+                    pkgNames.addAll(pkgManager.queryIntentActivities(intent, flags).map { res -> res.activityInfo.packageName })
+                    @Suppress("DEPRECATION")
+                    pkgNames.addAll(pkgManager.queryIntentServices(intent, flags).map { res -> res.serviceInfo.packageName })
+                    @Suppress("DEPRECATION")
+                    pkgNames.addAll(pkgManager.queryBroadcastReceivers(intent, flags).map { res -> res.activityInfo.packageName })
+                }
+                
+                pkgNames.forEach { pkgName ->
+                    if (installedPkgs.none { it.packageName == pkgName }) {
+                        try {
+                            val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                pkgManager.getPackageInfo(pkgName, PackageManager.PackageInfoFlags.of(PACKAGE_FLAGS.toLong()))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                pkgManager.getPackageInfo(pkgName, PACKAGE_FLAGS)
+                            }
+                            installedPkgs.add(pInfo)
+                            logcat(LogPriority.DEBUG) { "Tìm thấy extension qua Intent: $pkgName" }
+                        } catch (e: Exception) {
+                            // Bỏ qua nếu không lấy được info
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR) { "Lỗi khi quét package: ${e.message}" }
         }
         
         val sharedExtPkgs = installedPkgs
@@ -104,6 +168,16 @@ object ExtensionLoader {
     }
 
     private fun loadExtension(context: Context, info: ExtensionInfo, trustedSignatures: Set<String>): LoadResult {
+        val pkgName = info.packageInfo.packageName
+        return try {
+            loadExtensionInternal(context, info, trustedSignatures)
+        } catch (e: Throwable) {
+            logcat(LogPriority.ERROR) { "Lỗi nghiêm trọng khi nạp extension $pkgName: ${e.message}\n${e.stackTraceToString()}" }
+            LoadResult.Error
+        }
+    }
+
+    private fun loadExtensionInternal(context: Context, info: ExtensionInfo, trustedSignatures: Set<String>): LoadResult {
         val pkgManager = context.packageManager
         val pkgInfo = info.packageInfo
         val appInfo = pkgInfo.applicationInfo ?: return LoadResult.Error
@@ -115,35 +189,20 @@ object ExtensionLoader {
         val versionCode = PackageInfoCompat.getLongVersionCode(pkgInfo)
 
         // Đọc libVersion từ metadata key chuẩn (tachiyomi.extension.lib.version)
-        // Mihon APK có key này với giá trị như "1.5", "1.4" ...
-        // versionName là version của extension ("14.10.5") — KHÔNG phải libVersion
         val libVersion = metaData?.getString(METADATA_LIB_VERSION)?.toDoubleOrNull()
             ?: metaData?.getFloat(METADATA_LIB_VERSION, 0f)?.takeIf { it > 0f }?.toDouble()
-            // Fallback: thử parse versionName theo format "major.minor" (chỉ lấy 2 phần đầu)
-            ?: run {
-                val parts = versionName.split(".")
-                if (parts.size >= 2) "${parts[0]}.${parts[1]}".toDoubleOrNull() else null
-            }
-            ?: 1.5  // Default safe: assume 1.5 nếu không đọc được
+            ?: parseLibVersion(versionName)
 
-        // System-installed extensions: bypass libVersion check (user đã verify qua Android installer)
         // Private APK: vẫn cần check để tránh load extension incompatible
         if (!info.isShared && (libVersion < LIB_VERSION_MIN || libVersion > LIB_VERSION_MAX)) {
-            logcat(LogPriority.WARN) { "Extension $extName (private) có libVersion $libVersion không tương thích" }
+            logcat(LogPriority.WARN) { "Extension $extName ($pkgName, private) có libVersion $libVersion không tương thích (Yêu cầu $LIB_VERSION_MIN - $LIB_VERSION_MAX)" }
             return LoadResult.Error
         }
-        if (info.isShared && libVersion != 0.0 && libVersion < 1.0) {
-            // Chỉ reject nếu rõ ràng là version invalid (< 1.0)
-            logcat(LogPriority.WARN) { "Extension $extName có libVersion $libVersion không hợp lệ" }
-            return LoadResult.Error
-        }
-
+        
         val signatures = getSignatures(pkgInfo)
         val signatureHash = signatures.lastOrNull() ?: ""
         val trustKey = "$pkgName:$versionCode:$signatureHash"
 
-        // Extension cài từ hệ thống (isShared=true) = user đã xác nhận qua Android system installer
-        // → auto-trust, không cần xác nhận thêm.
         // Chỉ private APK (internal, isShared=false) mới cần trust thủ công.
         val requiresTrust = !info.isShared
         if (requiresTrust && !trustedSignatures.contains(trustKey)) {
@@ -161,7 +220,7 @@ object ExtensionLoader {
         }
 
         val classLoader = try {
-            ChildFirstPathClassLoader(appInfo?.sourceDir ?: "", null, context.classLoader)
+            ChildFirstPathClassLoader(appInfo.sourceDir ?: "", appInfo.nativeLibraryDir, context.classLoader)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR) { "Không thể tạo ClassLoader cho $pkgName: ${e.message}" }
             return LoadResult.Error
@@ -169,8 +228,10 @@ object ExtensionLoader {
 
         // Fix: Đồng bộ với Mihon — đọc từ METADATA_SOURCE_CLASS, split bằng ";", hỗ trợ relative class name
         val sourceClassRaw = metaData?.getString(METADATA_SOURCE_CLASS)
+            ?: metaData?.getString(METADATA_SOURCE_FACTORY)
+            
         if (sourceClassRaw.isNullOrBlank()) {
-            logcat(LogPriority.ERROR) { "Extension $pkgName thiếu metadata '${METADATA_SOURCE_CLASS}'" }
+            logcat(LogPriority.ERROR) { "Extension $pkgName thiếu metadata source class/factory" }
             return LoadResult.Error
         }
 
@@ -178,31 +239,27 @@ object ExtensionLoader {
             .split(";")
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-            .map { className ->
-                // Class name bắt đầu bằng '.' là relative → thêm package name phía trước
-                if (className.startsWith(".")) pkgName + className else className
-            }
+            .map { if (it.startsWith(".")) pkgName + it else it }
             .flatMap { className ->
                 try {
-                    when (val obj = Class.forName(className, false, classLoader)
-                        .getDeclaredConstructor().newInstance()) {
-                        is SourceFactory -> obj.createSources()   // Multi-source extension
-                        is Source        -> listOf(obj)            // Single-source extension
+                    logcat(LogPriority.DEBUG) { "Đang nạp class: $className từ $pkgName" }
+                    val sourceClass = Class.forName(className, false, classLoader)
+                    val obj = sourceClass.getDeclaredConstructor().newInstance()
+                    when (obj) {
+                        is SourceFactory -> obj.createSources()
+                        is Source -> listOf(obj)
                         else -> {
-                            logcat(LogPriority.ERROR) { "Unknown source type: ${obj.javaClass} in $pkgName" }
-                            return LoadResult.Error
+                            logcat(LogPriority.ERROR) { "Class $className không phải là Source hay SourceFactory" }
+                            emptyList()
                         }
                     }
                 } catch (e: Throwable) {
-                    logcat(LogPriority.ERROR) { "Lỗi khi nạp class '$className' từ $pkgName: ${e.message}" }
-                    return LoadResult.Error
+                    logcat(LogPriority.ERROR) { "Lỗi khi khởi tạo $className từ $pkgName: ${e.message}\n${e.stackTraceToString()}" }
+                    throw e
                 }
             }
 
-        if (sources.isEmpty()) {
-            logcat(LogPriority.ERROR) { "Extension $pkgName không có source nào" }
-            return LoadResult.Error
-        }
+        if (sources.isEmpty()) return LoadResult.Error
 
         val isNsfw = metaData?.getInt(METADATA_NSFW) == 1
         val lang = sources.filterIsInstance<CatalogueSource>().map { it.lang }.distinct().let {
@@ -217,9 +274,9 @@ object ExtensionLoader {
             libVersion = libVersion,
             lang = lang,
             isNsfw = isNsfw,
-            pkgFactory = appInfo?.metaData?.getString(METADATA_SOURCE_FACTORY),
+            pkgFactory = metaData?.getString(METADATA_SOURCE_FACTORY),
             sources = sources,
-            icon = appInfo?.loadIcon(pkgManager),
+            icon = appInfo.loadIcon(pkgManager),
             isShared = info.isShared,
             isVBook = false
         )
@@ -228,13 +285,14 @@ object ExtensionLoader {
     }
 
     private fun isPackageAnExtension(pkgInfo: PackageInfo): Boolean {
-        // Fix BUG-01: Một số extension cũ hoặc custom không khai báo reqFeatures đúng chuẩn Mihon
-        // Cần fallback kiểm tra metadata 'tachiyomi.extension.class' và package prefix
+        val pkgName = pkgInfo.packageName
         return pkgInfo.reqFeatures?.any { it.name == EXTENSION_FEATURE } == true ||
                pkgInfo.applicationInfo?.metaData?.containsKey(METADATA_SOURCE_CLASS) == true ||
-               pkgInfo.packageName.startsWith("eu.kanade.tachiyomi.extension.") ||
-               pkgInfo.packageName.startsWith("mihon.extension.") ||
-               pkgInfo.packageName.startsWith("com.example.manga_readerver2.extension.")
+               pkgInfo.applicationInfo?.metaData?.containsKey(METADATA_SOURCE_FACTORY) == true ||
+               pkgName.startsWith("eu.kanade.tachiyomi.extension.") ||
+               pkgName.startsWith("mihon.extension.") ||
+               pkgName.startsWith("com.example.manga_readerver2.extension.") ||
+               pkgName.contains(".extension.") // Fallback broad match
     }
 
     private fun getSignatures(pkgInfo: PackageInfo): List<String> {
@@ -246,6 +304,7 @@ object ExtensionLoader {
                 signingInfo?.signingCertificateHistory
             }
         } else {
+            @Suppress("DEPRECATION")
             pkgInfo.signatures
         }
 

@@ -23,6 +23,12 @@
         <intent>
             <action android:name="eu.kanade.tachiyomi.extension.ACTION_LOAD" />
         </intent>
+        <intent>
+            <action android:name="tachiyomi.extension.ACTION_LOAD" />
+        </intent>
+        <intent>
+            <action android:name="mihon.extension.ACTION_LOAD" />
+        </intent>
     </queries>
 
     <application

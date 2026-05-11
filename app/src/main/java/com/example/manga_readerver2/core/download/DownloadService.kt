@@ -22,12 +22,13 @@ import uy.kohesive.injekt.api.get
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
-import com.example.manga_readerver2.core.source.HttpSource
+import eu.kanade.tachiyomi.source.online.HttpSource
 import com.example.manga_readerver2.source_js.JsSource
 import com.example.manga_readerver2.core.utils.ZipUtil
 import com.example.manga_readerver2.core.utils.FileManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.withLock
 import com.example.manga_readerver2.core.utils.EpubExporter
 
 class DownloadService : Service() {
@@ -39,6 +40,7 @@ class DownloadService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var downloadJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private val mutex = kotlinx.coroutines.sync.Mutex()
 
     override fun onCreate() {
         super.onCreate()
@@ -73,39 +75,41 @@ class DownloadService : Service() {
     }
 
     private fun processQueue(queue: List<Download>) {
-        val currentDownload = queue.firstOrNull {
-            it.status == Download.State.QUEUE || it.status == Download.State.DOWNLOADING
-        }
+        scope.launch {
+            mutex.withLock {
+                val currentDownload = queue.firstOrNull {
+                    it.status == Download.State.QUEUE || it.status == Download.State.DOWNLOADING
+                }
 
-        if (currentDownload == null) {
-            releaseWakeLock()
-            stopSelf()
-            return
-        }
-
-        // Guard: job đang chạy thì không start thêm
-        if (downloadJob?.isActive == true) return
-
-        downloadJob = scope.launch {
-            downloadManager.updateDownloadState(currentDownload, Download.State.DOWNLOADING)
-            updateNotification("Đang tải: ${currentDownload.manga.title} - ${currentDownload.chapter.name}")
-
-            try {
-                downloadChapter(currentDownload)
-                downloadManager.updateDownloadState(currentDownload, Download.State.DOWNLOADED)
-                downloadManager.removeFromQueue(currentDownload)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                downloadManager.updateDownloadState(currentDownload, Download.State.ERROR)
-            } finally {
-                // Fix BUG-01: Set null TRƯỚC khi process next để tránh race condition.
-                // Fix BUG-02: Release WakeLock nếu không còn gì để tải.
-                downloadJob = null
-                val nextQueue = downloadManager.queueState.value
-                if (nextQueue.any { it.status == Download.State.QUEUE }) {
-                    processQueue(nextQueue)
-                } else {
+                if (currentDownload == null) {
                     releaseWakeLock()
+                    stopSelf()
+                    return@withLock
+                }
+
+                // Guard: job đang chạy thì không start thêm (double check)
+                if (downloadJob?.isActive == true) return@withLock
+
+                downloadJob = scope.launch {
+                    downloadManager.updateDownloadState(currentDownload, Download.State.DOWNLOADING)
+                    updateNotification("Đang tải: ${currentDownload.manga.title} - ${currentDownload.chapter.name}")
+
+                    try {
+                        downloadChapter(currentDownload)
+                        downloadManager.updateDownloadState(currentDownload, Download.State.DOWNLOADED)
+                        downloadManager.removeFromQueue(currentDownload)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        downloadManager.updateDownloadState(currentDownload, Download.State.ERROR)
+                    } finally {
+                        downloadJob = null
+                        val nextQueue = downloadManager.queueState.value
+                        if (nextQueue.any { it.status == Download.State.QUEUE }) {
+                            processQueue(nextQueue)
+                        } else {
+                            releaseWakeLock()
+                        }
+                    }
                 }
             }
         }
@@ -114,13 +118,24 @@ class DownloadService : Service() {
     private suspend fun downloadChapter(download: Download) {
         val source = download.source
         
-        // 1. Lấy danh sách trang
+        // 1. Lấy danh sách trang (có retry)
         val sChapter = eu.kanade.tachiyomi.source.model.SChapter.create().apply {
             url = download.chapter.url
             name = download.chapter.name
         }
-        val pages = source.getPageList(sChapter)
-        if (pages.isEmpty()) throw Exception("Danh sách trang rỗng")
+        
+        var pages: List<eu.kanade.tachiyomi.source.model.Page> = emptyList()
+        var retryCount = 0
+        while (pages.isEmpty() && retryCount < 3) {
+            try {
+                pages = source.getPageList(sChapter)
+            } catch (e: Exception) {
+                retryCount++
+                if (retryCount >= 3) throw e
+                delay(2000L * retryCount)
+            }
+        }
+        if (pages.isEmpty()) throw Exception("Danh sách trang rỗng sau 3 lần thử")
         
         download.pages = pages
         download.progress = 0
@@ -137,6 +152,7 @@ class DownloadService : Service() {
             
             val success = EpubExporter.export(download.manga, download.chapter, paragraphs, tmpNovelFile)
             if (success) {
+                if (novelFile.exists()) novelFile.delete()
                 if (tmpNovelFile.renameTo(novelFile)) {
                     downloadCache.addChapter(download.manga.id, download.chapter.name)
                     download.progress = 100
@@ -247,6 +263,7 @@ class DownloadService : Service() {
                 val zipSuccess = withContext(Dispatchers.IO) {
                     val success = ZipUtil.zipDirectory(tmpDir, tmpCbzFile, deleteSource = true)
                     if (success) {
+                        if (cbzFile.exists()) cbzFile.delete()
                         if (tmpCbzFile.renameTo(cbzFile)) {
                             success
                         } else {

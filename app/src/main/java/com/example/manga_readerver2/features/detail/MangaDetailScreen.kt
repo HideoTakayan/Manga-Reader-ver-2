@@ -47,7 +47,7 @@ import com.example.manga_readerver2.domain.model.Category
 import com.example.manga_readerver2.features.downloads.DownloadQueueScreen
 import com.example.manga_readerver2.features.reader.ReaderScreen
 import com.example.manga_readerver2.ui.theme.*
-import com.example.manga_readerver2.core.source.HttpSource
+import eu.kanade.tachiyomi.source.online.HttpSource
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import kotlinx.coroutines.launch
@@ -99,7 +99,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                     onRefresh = { screenModel.refreshManual() },
                 // isHttpSource: chỉ true khi là HTTP source thật sự (APK extension)
                 // VBook JS source cũng có source ID != 0 nên không dùng `source != 0L`
-                isHttpSource = source is com.example.manga_readerver2.core.source.HttpSource,
+                isHttpSource = source is eu.kanade.tachiyomi.source.online.HttpSource,
                 isScrolled = isScrolled
                 )
             }

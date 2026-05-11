@@ -182,7 +182,7 @@ class JsSource(
         if (it is kotlinx.serialization.json.JsonArray) it else emptyList<kotlinx.serialization.json.JsonElement>()
     }
 
-    override suspend fun fetchSearchManga(page: Int, query: String, filters: eu.kanade.tachiyomi.source.model.FilterList): eu.kanade.tachiyomi.source.MangasPage {
+    override suspend fun getSearchManga(page: Int, query: String, filters: eu.kanade.tachiyomi.source.model.FilterList): eu.kanade.tachiyomi.source.MangasPage {
         val script = scripts["search"] ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
         val result = engine.execute(script, "execute", query, page.toString()) ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
 

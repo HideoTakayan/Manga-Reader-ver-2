@@ -7,6 +7,7 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.example.manga_readerver2.core.download.DownloadManager
 import com.example.manga_readerver2.core.download.DownloadStore
 import com.example.manga_readerver2.core.source.ExtensionApi
+import eu.kanade.tachiyomi.network.NetworkHelper
 import com.example.manga_readerver2.core.source.ExtensionInstaller
 import com.example.manga_readerver2.core.source.ExtensionManager
 import com.example.manga_readerver2.core.source.SourcePreferences
@@ -102,6 +103,10 @@ class AppModule(val app: Application) : InjektModule {
 
         addSingletonFactory {
             ExtensionApi(get())
+        }
+
+        addSingletonFactory {
+            NetworkHelper(app)
         }
 
         addSingletonFactory {

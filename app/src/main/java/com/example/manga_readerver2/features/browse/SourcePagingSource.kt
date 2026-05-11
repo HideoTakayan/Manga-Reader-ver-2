@@ -31,7 +31,7 @@ class SourcePagingSource(
             val response = when (listing) {
                 is CatalogueScreenModel.Listing.Popular -> source.getPopularManga(page)
                 is CatalogueScreenModel.Listing.Latest -> source.getLatestUpdates(page)
-                is CatalogueScreenModel.Listing.Search -> source.fetchSearchManga(page, query, filters)
+                is CatalogueScreenModel.Listing.Search -> source.getSearchManga(page, query, filters)
             }
             
             val mangaList = response.mangas.map { sManga ->

@@ -29,6 +29,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
+import logcat.LogPriority
+import logcat.logcat
 import com.example.manga_readerver2.core.source.Extension
 import com.example.manga_readerver2.core.source.InstallStep
 import com.example.manga_readerver2.ui.theme.BackgroundDark
@@ -348,6 +350,19 @@ fun SourcesTab(
     enabledLangs: Set<String>,
     onTogglePin: (Long) -> Unit
 ) {
+    fun normalizeLang(code: String?): String {
+        if (code.isNullOrBlank()) return "all"
+        val normalized = code.trim().lowercase()
+        return when {
+            normalized == "global" || normalized == "tất cả" -> "all"
+            normalized == "vi" || normalized.contains("việt") -> "vi"
+            normalized == "en" || normalized.contains("english") || normalized.contains("anh") -> "en"
+            normalized.contains("_") -> normalized.substringBefore("_")
+            normalized.contains("-") -> normalized.substringBefore("-")
+            else -> normalized
+        }
+    }
+
     val filteredExts = extensions.filter { ext ->
         // ext.lang == "all" luôn hiện (đa ngôn ngữ), không phụ thuộc filter
         val matchLang = ext.lang == "all" || enabledLangs.contains("all") || enabledLangs.contains(ext.lang)
@@ -388,7 +403,7 @@ fun SourcesTab(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                     )
                 }
-                items(pinnedList, key = { "pinned_${it.first.id}" }) { (source, ext) ->
+                items(pinnedList, key = { "pinned_${it.first.id}_${it.second.pkgName}_${it.first.name}" }) { (source, ext) ->
                     SourceItem(navigator, source, ext, true, onTogglePin)
                 }
             }
@@ -411,7 +426,7 @@ fun SourcesTab(
                     )
                 }
 
-                items(sources, key = { "source_${it.first.id}" }) { (source, ext) ->
+                items(sources, key = { "source_${it.first.id}_${it.second.pkgName}_${it.first.name}" }) { (source, ext) ->
                     SourceItem(navigator, source, ext, false, onTogglePin)
                 }
             }

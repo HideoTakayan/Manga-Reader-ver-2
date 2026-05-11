@@ -23,7 +23,7 @@ import com.example.manga_readerver2.core.source.ExtensionManager
 import com.example.manga_readerver2.core.source.Extension
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.model.Page
-import com.example.manga_readerver2.core.source.HttpSource
+import eu.kanade.tachiyomi.source.online.HttpSource
 
 sealed class ReaderPage {
     data class Local(val file: File) : ReaderPage()
@@ -689,7 +689,7 @@ class ReaderScreenModel(
                     }
                 }
 
-                val onlineTempFile = File(context.cacheDir, "online_${index}_${imageUrl.hashCode()}.jpg")
+                val onlineTempFile = File(context.cacheDir, "online_${chapterId}_${index}_${imageUrl.hashCode()}.jpg")
                 withContext(Dispatchers.IO) { onlineTempFile.writeBytes(bytes) }
 
                 // Fix: Dùng copy() thay vì mutate trực tiếp để StateFlow trigger recompose đúng

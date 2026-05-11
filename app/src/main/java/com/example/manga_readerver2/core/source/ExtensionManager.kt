@@ -10,6 +10,8 @@ import com.example.manga_readerver2.source_dex.loader.ExtensionLoader
 import com.example.manga_readerver2.source_js.loader.JsLoader
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import android.os.Build
+import kotlinx.coroutines.delay
 import logcat.LogPriority
 import logcat.logcat
 import okhttp3.OkHttpClient
@@ -40,30 +42,32 @@ class ExtensionManager(
 
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
-            val pkgName = intent?.data?.encodedSchemeSpecificPart ?: return
-            // Fix: Kh\u00f4ng filter theo t\u00ean package \u2014 \u0111\u1ec3 ExtensionLoader.isPackageAnExtension() t\u1ef1 quy\u1ebft \u0111\u1ecbnh
-            // Filter c\u0169 b\u1ecf s\u00f3t extension t\u1eeb c\u00e1c nh\u00e0 ph\u00e1t tri\u1ec3n kh\u00f4ng d\u00f9ng t\u00ean "tachiyomi"/"keiyoushi"
-            logcat { "Package changed: $pkgName \u2014 reloading extensions" }
-            receiverScope.launch { loadLocalExtensions() }
+            val data = intent?.data ?: return
+            val pkgName = data.schemeSpecificPart ?: return
+            
+            logcat(LogPriority.DEBUG) { "Hệ thống thông báo thay đổi package: ${intent.action} cho $pkgName" }
+            
+            // Debounce reloading to avoid multiple scans during bulk updates
+            receiverScope.launch {
+                delay(500) // Chờ một chút để hệ thống ổn định
+                loadLocalExtensions()
+            }
         }
     }
 
     init {
-        // Dùng ContextCompat.registerReceiver với RECEIVER_NOT_EXPORTED (Mihon pattern - Android 13+ safe)
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
             addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
             addDataScheme("package")
         }
-        ContextCompat.registerReceiver(
-            context,
-            packageReceiver,
-            filter,
-            ContextCompat.RECEIVER_EXPORTED // Extension từ app khác (Mihon) cần EXPORTED
-        )
-
-        // Load ngay khi khởi tạo
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(packageReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(packageReceiver, filter)
+        }
+        
         receiverScope.launch { loadLocalExtensions() }
     }
 
@@ -80,11 +84,16 @@ class ExtensionManager(
                 loadResults.forEach { result ->
                     when (result) {
                         is LoadResult.Success -> {
+                            logcat(LogPriority.DEBUG) { "Nạp thành công extension: ${result.extension.name} với ${result.extension.sources.size} sources" }
                             loadedExtensions.add(result.extension)
                             loadedSources.addAll(result.extension.sources)
                         }
                         is LoadResult.Untrusted -> {
+                            logcat(LogPriority.WARN) { "Extension chưa được tin cậy: ${result.extension.name}" }
                             untrustedExtensions.add(result.extension)
+                        }
+                        is LoadResult.Error -> {
+                            logcat(LogPriority.ERROR) { "Lỗi khi nạp extension APK" }
                         }
                         else -> {}
                     }
@@ -130,7 +139,7 @@ class ExtensionManager(
                             loadedSources.add(source)
                         }
                     } catch (e: Exception) {
-                        logcat(LogPriority.ERROR) { "Error loading JS extension ${pluginDir.name}: ${e.message}" }
+                        logcat(LogPriority.ERROR) { "Error loading JS extension ${pluginDir.name}: ${e.message}\n${e.stackTraceToString()}" }
                     }
                 }
             }

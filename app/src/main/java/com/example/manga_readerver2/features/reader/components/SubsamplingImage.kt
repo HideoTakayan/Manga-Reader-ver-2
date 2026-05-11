@@ -1,27 +1,41 @@
 package com.example.manga_readerver2.features.reader.components
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.content.Context
+import android.graphics.PointF
+import android.view.GestureDetector
 import android.view.MotionEvent
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.davemorrissey.labs.subscaleview.ImageSource
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
-import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.size
+import logcat.LogPriority
+import logcat.logcat
+import java.io.File
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun SubsamplingImage(
     model: Any?,
     modifier: Modifier = Modifier,
     scaleMode: Int = 0, // 0: Fit Screen, 1: Fit Width, 2: Fit Height
-    isVertical: Boolean = false,
+    isWebtoon: Boolean = false,
     onTap: ((x: Float, y: Float, width: Float) -> Unit)? = null
 ) {
+    val currentOnTap = rememberUpdatedState(onTap)
     val contentScale = when(scaleMode) {
         1 -> SubsamplingScaleImageView.SCALE_TYPE_START
         2 -> SubsamplingScaleImageView.SCALE_TYPE_CENTER_CROP
@@ -29,27 +43,21 @@ fun SubsamplingImage(
     }
     val context = androidx.compose.ui.platform.LocalContext.current
     
-    // Quản lý file tạm để tránh rò rỉ bộ nhớ
     val imageSource by produceState<ImageSource?>(initialValue = null, model) {
-        value = withContext(kotlinx.coroutines.Dispatchers.IO) {
+        value = withContext(Dispatchers.IO) {
             try {
                 when (model) {
-                    is String -> {
-                        if (File(model).exists()) ImageSource.uri(model) else null
-                    }
+                    is String -> if (File(model).exists()) ImageSource.uri(model) else null
                     is ByteArray -> {
-                        // Fix BUG-04: Kết hợp contentHash + size để giảm collision.
-                        // Arrays.hashCode() chỉ 32-bit, dễ collision với nhiều ảnh khác nhau.
                         val contentHash = "${java.util.Arrays.hashCode(model)}_${model.size}"
                         val tempFile = File(context.cacheDir, "reader_page_${contentHash}.tmp")
-                        if (!tempFile.exists()) {
-                            tempFile.writeBytes(model)
-                        }
+                        if (!tempFile.exists()) tempFile.writeBytes(model)
                         ImageSource.uri(tempFile.absolutePath)
                     }
                     else -> null
                 }
             } catch (e: Exception) {
+                logcat(LogPriority.ERROR) { "Error loading image: ${e.message}" }
                 null
             }
         }
@@ -58,86 +66,71 @@ fun SubsamplingImage(
     val lastSource = remember { mutableStateOf<ImageSource?>(null) }
     
     if (imageSource != null) {
-        AndroidView(
-            factory = { ctx ->
-                SubsamplingScaleImageView(ctx).apply {
-                    setMinimumScaleType(contentScale)
-                    setPanLimit(SubsamplingScaleImageView.PAN_LIMIT_INSIDE)
-                    // Cấu hình mượt mà như Mihon
-                    setDoubleTapZoomDuration(250)
-                    setDoubleTapZoomStyle(SubsamplingScaleImageView.ZOOM_FOCUS_CENTER)
-                    setMinimumDpi(80)
-                    
-                    setZoomEnabled(!isVertical)
-                    setPanEnabled(!isVertical)
-                    
-                    var startX = 0f
-                    var startY = 0f
-                    var lastX = 0f
-                    var lastY = 0f
-                    
-                    setOnTouchListener { view, event ->
-                        if (isVertical) return@setOnTouchListener false
-                        
-                        val scaleImageView = view as SubsamplingScaleImageView
-                        val isZoomed = scaleImageView.scale > scaleImageView.minScale
-                        
-                        when (event.actionMasked) {
-                            MotionEvent.ACTION_DOWN -> {
-                                startX = event.x
-                                startY = event.y
-                                lastX = event.x
-                                lastY = event.y
-                                // Parent might want to intercept later if we don't disallow now
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+        ) {
+            if (isWebtoon) {
+                AsyncImage(
+                    model = model,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .pointerInput(Unit) {
+                            detectTapGestures { offset ->
+                                currentOnTap.value?.invoke(offset.x, offset.y, size.width.toFloat())
                             }
-                            MotionEvent.ACTION_MOVE -> {
-                                val dx = event.x - startX
-                                val dy = event.y - startY
-                                val absDx = Math.abs(dx)
-                                val absDy = Math.abs(dy)
-                                
-                                // Nếu đang zoom hoặc chạm đa điểm, và đã di chuyển đủ xa
-                                if ((isZoomed || event.pointerCount > 1) && (absDx > 10 || absDy > 10)) {
-                                    val directionX = if (dx < 0) 1 else -1
-                                    val directionY = if (dy < 0) 1 else -1
-                                    
-                                    val canPanX = scaleImageView.canScrollHorizontally(directionX)
-                                    val canPanY = scaleImageView.canScrollVertically(directionY)
-                                    
-                                    // Chỉ chặn Pager/List cha nếu ảnh có thể pan theo hướng vuốt
-                                    if (canPanX || canPanY || event.pointerCount > 1) {
-                                        view.parent?.requestDisallowInterceptTouchEvent(true)
-                                    }
+                        },
+                    contentScale = ContentScale.FillWidth
+                )
+            } else {
+                AndroidView(
+                    factory = { ctx ->
+                        SubsamplingScaleImageView(ctx).apply {
+                            setMinimumScaleType(contentScale)
+                            setPanLimit(SubsamplingScaleImageView.PAN_LIMIT_INSIDE)
+                            setQuickScaleEnabled(false)
+                            setMinimumDpi(80)
+                            setZoomEnabled(true)
+                            setPanEnabled(true)
+                            
+                            val detector = GestureDetector(ctx, object : GestureDetector.SimpleOnGestureListener() {
+                                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                                    currentOnTap.value?.invoke(e.x, e.y, width.toFloat())
+                                    return true
                                 }
-                            }
-                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                                lastX = event.x
-                                lastY = event.y
-                                view.parent?.requestDisallowInterceptTouchEvent(false)
+                                override fun onDoubleTap(e: MotionEvent): Boolean {
+                                    if (scale > minScale) {
+                                        animateScaleAndCenter(minScale, center)?.withDuration(250)?.start()
+                                    } else {
+                                        val targetScale = Math.min(maxScale, minScale * 2f)
+                                        animateScaleAndCenter(targetScale, PointF(e.x, e.y))?.withDuration(250)?.start()
+                                    }
+                                    return true
+                                }
+                            })
+                            
+                            setOnTouchListener { _, event ->
+                                detector.onTouchEvent(event)
+                                false
                             }
                         }
-                        false 
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { view ->
+                        view.setMinimumScaleType(contentScale)
+                        if (lastSource.value != imageSource) {
+                            view.setImage(imageSource!!)
+                            lastSource.value = imageSource
+                        }
                     }
-                    setOnClickListener {
-                        onTap?.invoke(lastX, lastY, width.toFloat())
-                    }
-                }
-            },
-            modifier = modifier.fillMaxSize(),
-            update = { view ->
-                view.setMinimumScaleType(contentScale)
-                // Fix: Chỉ set image nếu source thực sự thay đổi để tránh reset zoom/pan khi UI recompose
-                if (lastSource.value != imageSource) {
-                    view.setImage(imageSource!!)
-                    lastSource.value = imageSource
-                }
+                )
             }
-        )
+        }
     } else {
-        // Fallback loading indicator
-        androidx.compose.material3.CircularProgressIndicator(
-            modifier = Modifier.size(48.dp),
-            color = com.example.manga_readerver2.ui.theme.PrimaryOrange
-        )
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = com.example.manga_readerver2.ui.theme.PrimaryOrange, modifier = Modifier.size(48.dp))
+        }
     }
 }

@@ -50,6 +50,26 @@ class BrowseScreenModel(
 
     init {
         observeRepos()
+        observeInstalledExtensions()
+    }
+
+    private fun observeInstalledExtensions() {
+        installedExtensions.onEach { installed ->
+            val installedPkgs = installed.map { it.pkgName }
+            val currentSteps = _installSteps.value
+            var changed = false
+            val newSteps = currentSteps.mapValues { (pkgName, step) ->
+                if (pkgName in installedPkgs && step == InstallStep.SystemInstallStarted) {
+                    changed = true
+                    InstallStep.Installed
+                } else {
+                    step
+                }
+            }
+            if (changed) {
+                _installSteps.value = newSteps
+            }
+        }.launchIn(screenModelScope)
     }
 
     private fun observeRepos() {

@@ -75,7 +75,7 @@ class GlobalSearchScreenModel(
             sources.map { source ->
                 async(searchDispatcher) {
                     try {
-                        val resultPage = source.fetchSearchManga(1, query, source.getFilterList())
+                        val resultPage = source.getSearchManga(1, query, source.getFilterList())
                         val mangas = resultPage.mangas.map { sManga: eu.kanade.tachiyomi.source.model.SManga ->
                             Manga(
                                 id = "${source.id}${sManga.url}".hashCode().toLong(),

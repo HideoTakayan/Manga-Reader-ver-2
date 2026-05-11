@@ -31,6 +31,10 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.rxjava)
+    implementation(libs.rxandroid)
+    implementation(libs.okhttp)
+    implementation(libs.jsoup)
 }
 
 
