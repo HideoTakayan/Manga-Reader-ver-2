@@ -115,17 +115,25 @@ class BrowseScreen : Screen {
         
         val processedInstallSteps = remember { mutableSetOf<String>() }
         
-        // Fix: Theo dõi trạng thái cài đặt hệ thống để thông báo cho người dùng
         LaunchedEffect(installSteps) {
             installSteps.forEach { (pkg, step) ->
-                if (step == InstallStep.SystemInstallStarted && !processedInstallSteps.contains(pkg)) {
-                    processedInstallSteps.add(pkg)
-                    snackbarHostState.showSnackbar(
-                        message = "Vui lòng hoàn tất cài đặt trong hộp thoại hệ thống",
-                        duration = SnackbarDuration.Short
-                    )
-                } else if (step == InstallStep.Installed || step == InstallStep.Error) {
-                    // Nếu đã cài xong hoặc lỗi, có thể bỏ qua
+                if (!processedInstallSteps.contains(pkg + step.name)) {
+                    processedInstallSteps.add(pkg + step.name)
+                    when (step) {
+                        InstallStep.SystemInstallStarted -> snackbarHostState.showSnackbar(
+                            message = "Vui lòng hoàn tất cài đặt trong hộp thoại hệ thống",
+                            duration = SnackbarDuration.Short
+                        )
+                        InstallStep.Installed -> snackbarHostState.showSnackbar(
+                            message = "Đã cài đặt — chuyển sang tab Nguồn để sử dụng",
+                            duration = SnackbarDuration.Short
+                        )
+                        InstallStep.Error -> snackbarHostState.showSnackbar(
+                            message = "Cài đặt thất bại — kiểm tra logcat để biết chi tiết",
+                            duration = SnackbarDuration.Long
+                        )
+                        else -> {}
+                    }
                 }
             }
         }
@@ -622,7 +630,7 @@ fun ExtensionsTab(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         "Nhấn TIN CẬY để nguồn APK xuất hiện trong tab Nguồn.",
-                        color = Color.Gray,
+                        color = Color.Yellow,
                         fontSize = 12.sp
                     )
                 }

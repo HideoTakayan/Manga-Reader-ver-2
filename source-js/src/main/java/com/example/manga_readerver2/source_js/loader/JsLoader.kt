@@ -106,7 +106,7 @@ object JsLoader {
                 author = config.metadata.author,
                 isNovel = config.metadata.type == "novel"
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             logcat(LogPriority.ERROR) { "Failed to load JS extension from ${pluginDir.absolutePath}: ${e.message}" }
             null
         }
