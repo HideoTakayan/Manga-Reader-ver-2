@@ -34,6 +34,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.logcat)
     implementation(libs.injekt)
+    implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.apache.commons.compress)
 }

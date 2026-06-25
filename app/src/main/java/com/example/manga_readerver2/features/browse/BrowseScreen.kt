@@ -1,4 +1,4 @@
-package com.example.manga_readerver2.features.browse
+﻿package com.example.manga_readerver2.features.browse
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,12 +33,28 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import logcat.LogPriority
 import logcat.logcat
 import com.example.manga_readerver2.core.source.Extension
 import com.example.manga_readerver2.core.source.InstallStep
 import com.example.manga_readerver2.ui.theme.BackgroundDark
 import com.example.manga_readerver2.ui.theme.PrimaryOrange
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
+
+fun isJsExtension(ext: Extension): Boolean {
+    return when (ext) {
+        is Extension.Installed -> ext.pkgName.startsWith("js.extension.") || ext.sources.any { it::class.java.simpleName == "JsSource" }
+        is Extension.Available -> ext.pkgName.startsWith("js.extension.") || ext.apkName.endsWith(".zip", ignoreCase = true)
+        is Extension.Untrusted -> ext.pkgName.startsWith("js.extension.")
+    }
+}
 
 class BrowseScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -56,43 +73,24 @@ class BrowseScreen : Screen {
         val enabledLangs by screenModel.enabledLanguages.collectAsState()
 
         var selectedTab by remember { mutableIntStateOf(0) }
-        val tabs = listOf("Nguồn", "Phần mở rộng")
+        val tabs = listOf("Nguá»“n", "Pháº§n má»Ÿ rá»™ng")
 
-        // Tìm kiếm local cho tab Phần mở rộng
+        // TĂ¬m kiáº¿m local cho tab Pháº§n má»Ÿ rá»™ng
         var isSearching by remember { mutableStateOf(false) }
         var searchQuery by remember { mutableStateOf("") }
 
-        // Bộ lọc nội dung: 0 - Tất cả, 1 - Manga (APK), 2 - Truyện chữ (JS)
+        // Bá»™ lá»c ná»™i dung: 0 - Táº¥t cáº£, 1 - Manga (APK), 2 - Truyá»‡n chá»¯ (JS)
         var contentTypeFilter by remember { mutableIntStateOf(0) }
         
-        var showLangDialog by remember { mutableStateOf(false) }
-        var selectedExtensionForDetail by remember { mutableStateOf<Extension.Available?>(null) }
-
-        // Dùng OpenDocument thay vì GetContent để hỗ trợ nhiều MIME type (JS + ZIP)
-        val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-            contract = object : androidx.activity.result.contract.ActivityResultContract<Unit, android.net.Uri?>() {
-                override fun createIntent(context: android.content.Context, input: Unit): android.content.Intent {
-                    return android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(android.content.Intent.CATEGORY_OPENABLE)
-                        type = "*/*"
-                        putExtra(
-                            android.content.Intent.EXTRA_MIME_TYPES,
-                            arrayOf(
-                                "application/javascript",  // .js
-                                "text/javascript",
-                                "application/zip",         // .zip
-                                "application/x-zip-compressed",
-                                "application/octet-stream" // fallback
-                            )
-                        )
-                    }
-                }
-                override fun parseResult(resultCode: Int, intent: android.content.Intent?) =
-                    if (resultCode == android.app.Activity.RESULT_OK) intent?.data else null
-            }
+        val folderPickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocumentTree()
         ) { uri ->
-            uri?.let { screenModel.importExtension(it) }
+            uri?.let { screenModel.updateLocalSourceUri(it.toString()) }
         }
+        
+        var showLangDialog by remember { mutableStateOf(false) }
+        var selectedExtensionForDetail by remember { mutableStateOf<Extension?>(null) }
+
 
         val snackbarHostState = remember { SnackbarHostState() }
 
@@ -123,15 +121,15 @@ class BrowseScreen : Screen {
                     processedInstallSteps.add(pkg + step.name)
                     when (step) {
                         InstallStep.SystemInstallStarted -> snackbarHostState.showSnackbar(
-                            message = "Vui lòng hoàn tất cài đặt trong hộp thoại hệ thống",
+                            message = "Vui lĂ²ng hoĂ n táº¥t cĂ i Ä‘áº·t trong há»™p thoáº¡i há»‡ thá»‘ng",
                             duration = SnackbarDuration.Short
                         )
                         InstallStep.Installed -> snackbarHostState.showSnackbar(
-                            message = "Đã cài đặt — chuyển sang tab Nguồn để sử dụng",
+                            message = "ÄĂ£ cĂ i Ä‘áº·t â€” chuyá»ƒn sang tab Nguá»“n Ä‘á»ƒ sá»­ dá»¥ng",
                             duration = SnackbarDuration.Short
                         )
                         InstallStep.Error -> snackbarHostState.showSnackbar(
-                            message = "Cài đặt thất bại — kiểm tra logcat để biết chi tiết",
+                            message = "CĂ i Ä‘áº·t tháº¥t báº¡i â€” kiá»ƒm tra logcat Ä‘á»ƒ biáº¿t chi tiáº¿t",
                             duration = SnackbarDuration.Long
                         )
                         else -> {}
@@ -155,13 +153,8 @@ class BrowseScreen : Screen {
                     )
                 } else {
                     TopAppBar(
-                        title = { Text("Duyệt", color = Color.White, fontWeight = FontWeight.Bold) },
+                        title = { Text("Duyá»‡t", color = Color.White, fontWeight = FontWeight.Bold) },
                         actions = {
-                            if (selectedTab == 1) {
-                                IconButton(onClick = { importLauncher.launch(Unit) }) {
-                                    Icon(Icons.Default.FileOpen, contentDescription = "Nhập file", tint = Color.White)
-                                }
-                            }
                             IconButton(onClick = { 
                                 if (selectedTab == 0) {
                                     rootNavigator.push(GlobalSearchScreen()) 
@@ -169,16 +162,26 @@ class BrowseScreen : Screen {
                                     isSearching = true
                                 }
                             }) {
-                                Icon(Icons.Default.Search, contentDescription = "Tìm kiếm", tint = Color.White)
+                                Icon(Icons.Default.Search, contentDescription = "TĂ¬m kiáº¿m", tint = Color.White)
                             }
                             IconButton(onClick = { showLangDialog = true }) {
-                                Icon(Icons.Default.Language, contentDescription = "Ngôn ngữ", tint = Color.White)
+                                Icon(Icons.Default.Language, contentDescription = "NgĂ´n ngá»¯", tint = Color.White)
                             }
-                            IconButton(onClick = { screenModel.refreshExtensions() }) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Làm mới", tint = Color.White)
+                            IconButton(onClick = { 
+                                if (selectedTab == 0) {
+                                    folderPickerLauncher.launch(null)
+                                } else {
+                                    screenModel.refreshExtensions()
+                                }
+                            }) {
+                                Icon(
+                                    if (selectedTab == 0) Icons.Default.FolderOpen else Icons.Default.Refresh, 
+                                    contentDescription = if (selectedTab == 0) "Local Source" else "LĂ m má»›i", 
+                                    tint = Color.White
+                                )
                             }
                             IconButton(onClick = { rootNavigator.push(ExtensionRepoScreen()) }) {
-                                Icon(Icons.Default.SettingsInputComponent, contentDescription = "Quản lý nguồn", tint = Color.White)
+                                Icon(Icons.Default.SettingsInputComponent, contentDescription = "Quáº£n lĂ½ nguá»“n", tint = Color.White)
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -187,7 +190,7 @@ class BrowseScreen : Screen {
             }
         ) { paddingValues ->
             Column(modifier = Modifier.padding(paddingValues)) {
-                // Tab chọn Nguồn hoặc Phần mở rộng
+                // Tab chá»n Nguá»“n hoáº·c Pháº§n má»Ÿ rá»™ng
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = BackgroundDark,
@@ -209,7 +212,7 @@ class BrowseScreen : Screen {
                     }
                 }
 
-                // Bộ lọc loại nội dung (Manga/Truyện chữ)
+                // Bá»™ lá»c loáº¡i ná»™i dung (Manga/Truyá»‡n chá»¯)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -219,7 +222,7 @@ class BrowseScreen : Screen {
                     FilterChip(
                         selected = contentTypeFilter == 0,
                         onClick = { contentTypeFilter = 0 },
-                        label = { Text("Tất cả") },
+                        label = { Text("Táº¥t cáº£") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = PrimaryOrange.copy(alpha = 0.2f),
                             selectedLabelColor = PrimaryOrange
@@ -237,10 +240,10 @@ class BrowseScreen : Screen {
                     FilterChip(
                         selected = contentTypeFilter == 2,
                         onClick = { contentTypeFilter = 2 },
-                        label = { Text("Truyện chữ (JS)") },
+                        label = { Text("Truyá»‡n chá»¯ (JS)") },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = PrimaryOrange.copy(alpha = 0.2f),
-                            selectedLabelColor = PrimaryOrange
+                            selectedContainerColor = Color(0xFF1565C0).copy(alpha = 0.3f),
+                            selectedLabelColor = Color(0xFF64B5F6)
                         )
                     )
                 }
@@ -288,14 +291,10 @@ class BrowseScreen : Screen {
             }
 
             if (selectedExtensionForDetail != null) {
-                ExtensionDetailDialog(
+                ExtensionDetailsDialog(
                     extension = selectedExtensionForDetail!!,
-                    installStep = installSteps[selectedExtensionForDetail!!.pkgName] ?: InstallStep.Pending,
-                    onInstall = { 
-                        screenModel.installExtension(selectedExtensionForDetail!!)
-                        selectedExtensionForDetail = null
-                    },
-                    onDismiss = { selectedExtensionForDetail = null }
+                    onDismiss = { selectedExtensionForDetail = null },
+                    onUninstall = { screenModel.uninstallExtension(selectedExtensionForDetail!!.pkgName) }
                 )
             }
         }
@@ -309,8 +308,8 @@ fun LanguageFilterDialog(
     onLangsChanged: (Set<String>) -> Unit
 ) {
     val allLangs = listOf(
-        "all" to "Tất cả",
-        "vi" to "Tiếng Việt", 
+        "all" to "Táº¥t cáº£",
+        "vi" to "Tiáº¿ng Viá»‡t", 
         "en" to "English", 
         "ja" to "Japanese",
         "zh" to "Chinese",
@@ -319,7 +318,7 @@ fun LanguageFilterDialog(
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ngôn ngữ nguồn", color = Color.White) },
+        title = { Text("NgĂ´n ngá»¯ nguá»“n", color = Color.White) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 allLangs.forEach { (code, name) ->
@@ -378,8 +377,8 @@ fun SourcesTab(
         if (code.isNullOrBlank()) return "all"
         val normalized = code.trim().lowercase()
         return when {
-            normalized == "global" || normalized == "tất cả" -> "all"
-            normalized == "vi" || normalized.contains("việt") -> "vi"
+            normalized == "global" || normalized == "táº¥t cáº£" -> "all"
+            normalized == "vi" || normalized.contains("viá»‡t") -> "vi"
             normalized == "en" || normalized.contains("english") || normalized.contains("anh") -> "en"
             normalized.contains("_") -> normalized.substringBefore("_")
             normalized.contains("-") -> normalized.substringBefore("-")
@@ -388,25 +387,50 @@ fun SourcesTab(
     }
 
     val normalizedEnabledLangs = enabledLangs.map { normalizeLang(it) }.toSet()
-    val sourceWithExt = extensions.flatMap { ext -> ext.sources.map { source -> source to ext } }
+    
+    val localSource = remember { Injekt.get<com.example.manga_readerver2.core.source.LocalSource>() }
+    val fakeLocalExt = remember(localSource) {
+        Extension.Installed(
+            name = "Local source",
+            pkgName = "local.source",
+            versionName = "1.0",
+            versionCode = 1,
+            libVersion = 1.0,
+            lang = "other",
+            isNsfw = false,
+            pkgFactory = null,
+            sources = listOf(localSource),
+            icon = null,
+            hasUpdate = false,
+            isObsolete = false,
+            isShared = false,
+            repoUrl = null
+        )
+    }
+    
+    val sourceWithExt = listOf(localSource to fakeLocalExt) + extensions.flatMap { ext -> ext.sources.map { source -> source to ext } }
 
-    fun matchType(ext: Extension.Installed): Boolean = when (filter) {
-        1 -> !ext.isVBook
-        2 -> ext.isVBook
-        else -> true
+    fun matchType(ext: Extension.Installed): Boolean {
+        val isJs = isJsExtension(ext)
+        return when (filter) {
+            1 -> !isJs  // "Manga (APK)": chá»‰ hiá»‡n APK, áº©n JS
+            2 -> isJs   // "Truyá»‡n chá»¯ (JS)": chá»‰ hiá»‡n JS
+            else -> true // "Táº¥t cáº£": hiá»‡n táº¥t cáº£
+        }
     }
 
-    fun matchLang(ext: Extension.Installed): Boolean {
-        val extLang = normalizeLang(ext.lang)
-        return extLang == "all" || normalizedEnabledLangs.contains("all") || normalizedEnabledLangs.contains(extLang)
+    fun matchLang(source: eu.kanade.tachiyomi.source.Source): Boolean {
+        if (normalizedEnabledLangs.isEmpty()) return true
+        val sourceLang = normalizeLang(source.lang)
+        return sourceLang == "all" || normalizedEnabledLangs.contains("all") || normalizedEnabledLangs.contains(sourceLang)
     }
 
-    val allSources = sourceWithExt.filter { (_, ext) ->
-        matchType(ext) && matchLang(ext)
+    val allSources = sourceWithExt.filter { (source, ext) ->
+        matchType(ext) && matchLang(source)
     }
 
     val hiddenByTypeCount = sourceWithExt.count { (_, ext) -> !matchType(ext) }
-    val hiddenByLanguageCount = sourceWithExt.count { (_, ext) -> matchType(ext) && !matchLang(ext) }
+    val hiddenByLanguageCount = sourceWithExt.count { (source, ext) -> matchType(ext) && !matchLang(source) }
 
     val pinnedList = allSources.filter { pinnedSources.contains(it.first.id.toString()) }
     val unpinnedGrouped = allSources
@@ -417,13 +441,13 @@ fun SourcesTab(
     if (allSources.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Chưa có nguồn nào phù hợp", color = Color.Gray)
+                Text("ChÆ°a cĂ³ nguá»“n nĂ o phĂ¹ há»£p", color = Color.Gray)
                 if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0) {
                     Spacer(modifier = Modifier.height(6.dp))
                     val reasons = buildList {
-                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount nguồn bị ẩn theo ngôn ngữ")
-                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount nguồn bị ẩn theo loại nội dung")
-                    }.joinToString(" • ")
+                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount nguá»“n bá»‹ áº©n theo ngĂ´n ngá»¯")
+                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount nguá»“n bá»‹ áº©n theo loáº¡i ná»™i dung")
+                    }.joinToString(" â€¢ ")
                     Text(
                         text = reasons,
                         color = Color.Gray,
@@ -440,11 +464,11 @@ fun SourcesTab(
             if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0) {
                 item(key = "hidden_hint") {
                     val reasons = buildList {
-                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount bị ẩn theo ngôn ngữ")
-                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount bị ẩn theo loại nội dung")
-                    }.joinToString(" • ")
+                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount bá»‹ áº©n theo ngĂ´n ngá»¯")
+                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount bá»‹ áº©n theo loáº¡i ná»™i dung")
+                    }.joinToString(" â€¢ ")
                     Text(
-                        text = "Đang ẩn: $reasons",
+                        text = "Äang áº©n: $reasons",
                         color = Color.Gray,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -455,7 +479,7 @@ fun SourcesTab(
             if (pinnedList.isNotEmpty()) {
                 item(key = "header_pinned") {
                     Text(
-                        "Đã ghim", 
+                        "ÄĂ£ ghim", 
                         color = PrimaryOrange, 
                         fontSize = 12.sp, 
                         fontWeight = FontWeight.Bold,
@@ -469,9 +493,9 @@ fun SourcesTab(
 
             unpinnedGrouped.forEach { (lang, sources) ->
                 val langName = when (lang.lowercase()) {
-                    "vi" -> "Tiếng Việt"
+                    "vi" -> "Tiáº¿ng Viá»‡t"
                     "en" -> "English"
-                    "all" -> "Đa ngôn ngữ"
+                    "all" -> "Äa ngĂ´n ngá»¯"
                     else -> lang.uppercase()
                 }
 
@@ -501,9 +525,28 @@ fun SourceItem(
     isPinned: Boolean,
     onTogglePin: (Long) -> Unit
 ) {
+    val isJsSource = isJsExtension(ext)
+    val isLocal = ext.pkgName == "local.source"
     ListItem(
         headlineContent = { 
-            Text(source.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp) 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(source.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                if (isJsSource || isLocal) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = if (isLocal) Color(0xFF4CAF50).copy(alpha = 0.25f) else Color(0xFF1565C0).copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = if (isLocal) "MĂY" else "JS",
+                            color = if (isLocal) Color(0xFFA5D6A7) else Color(0xFF90CAF9),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
         },
         supportingContent = { 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -513,10 +556,10 @@ fun SourceItem(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(" • ", color = Color.Gray)
+                Text(" â€¢ ", color = Color.Gray, fontSize = 12.sp)
                 Text(
-                    if (ext.isVBook) "TRUYỆN CHỮ" else "MANGA",
-                    color = Color.Gray,
+                    if (isLocal) "THÆ¯ Má»¤C" else if (isJsSource) "TRUYá»†N CHá»® (JS)" else "MANGA (APK)",
+                    color = if (isLocal) Color(0xFF81C784) else if (isJsSource) Color(0xFF64B5F6) else Color.Gray,
                     fontSize = 12.sp
                 )
             }
@@ -534,10 +577,19 @@ fun SourceItem(
                     )
                 } else {
                     Box(
-                        modifier = Modifier.fillMaxSize().background(Color.DarkGray, RoundedCornerShape(8.dp)),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                if (isJsSource) Color(0xFF1565C0).copy(alpha = 0.3f) else Color.DarkGray,
+                                RoundedCornerShape(8.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Public, tint = Color.LightGray, contentDescription = null)
+                        Icon(
+                            if (isJsSource) Icons.Default.Code else Icons.Default.Public,
+                            tint = if (isJsSource) Color(0xFF64B5F6) else Color.LightGray,
+                            contentDescription = null
+                        )
                     }
                 }
             }
@@ -550,7 +602,7 @@ fun SourceItem(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = PrimaryOrange)
                 ) {
-                    Text("MỚI NHẤT", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Má»I NHáº¤T", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                 }
                 IconButton(onClick = { onTogglePin(source.id) }) {
                     Icon(
@@ -581,13 +633,14 @@ fun ExtensionsTab(
     onInstall: (Extension.Available) -> Unit,
     onTrust: (Extension.Untrusted) -> Unit,
     onUninstall: (String) -> Unit,
-    onDetail: (Extension.Available) -> Unit
+    onDetail: (Extension) -> Unit
 ) {
     // Untrusted extensions
     val filteredUntrusted = untrusted.filter { ext ->
+        val isJs = isJsExtension(ext)
         val matchType = when (filter) {
-            1 -> true // APKs
-            2 -> false // JS never untrusted for now
+            1 -> !isJs // APKs
+            2 -> isJs // JS never untrusted for now, but technically we should filter properly
             else -> true
         }
         val matchQuery = query.isEmpty() || ext.name.contains(query, ignoreCase = true) || ext.pkgName.contains(query, ignoreCase = true)
@@ -596,9 +649,10 @@ fun ExtensionsTab(
 
     // Installed extensions
     val filteredInstalled = installed.filter { ext ->
+        val isJs = isJsExtension(ext)
         val matchType = when (filter) {
-            1 -> !ext.isVBook
-            2 -> ext.isVBook
+            1 -> !isJs
+            2 -> isJs
             else -> true
         }
         val matchQuery = query.isEmpty() || ext.name.contains(query, ignoreCase = true) || ext.pkgName.contains(query, ignoreCase = true)
@@ -607,15 +661,16 @@ fun ExtensionsTab(
     
     // Available extensions grouped by language
     val filteredAvailable = available.filter { avail ->
+        val isJs = isJsExtension(avail)
         val matchType = when (filter) {
-            1 -> !avail.isVBook
-            2 -> avail.isVBook
+            1 -> !isJs
+            2 -> isJs
             else -> true
         }
-        // lang='all' luôn hiện; nếu user chọn "all" thì tất cả pass
+        // lang='all' luĂ´n hiá»‡n; náº¿u user chá»n "all" thĂ¬ táº¥t cáº£ pass
         val matchLang = avail.lang == "all" || enabledLangs.contains("all") || enabledLangs.contains(avail.lang)
         val matchQuery = query.isEmpty() || avail.name.contains(query, ignoreCase = true) || avail.pkgName.contains(query, ignoreCase = true)
-        installed.none { it.pkgName == avail.pkgName } && matchType && matchLang && matchQuery
+        installed.none { it.pkgName == avail.pkgName } && untrusted.none { it.pkgName == avail.pkgName } && matchType && matchLang && matchQuery
     }.groupBy { it.lang }.toSortedMap()
 
     LazyColumn(
@@ -626,32 +681,37 @@ fun ExtensionsTab(
             item(key = "header_untrusted") {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
-                        "CHƯA TIN CẬY (${filteredUntrusted.size})",
+                        "CHÆ¯A TIN Cáº¬Y (${filteredUntrusted.size})",
                         color = Color.Red,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Nhấn TIN CẬY để nguồn APK xuất hiện trong tab Nguồn.",
+                        "Nháº¥n TIN Cáº¬Y Ä‘á»ƒ nguá»“n APK xuáº¥t hiá»‡n trong tab Nguá»“n.",
                         color = Color.Yellow,
                         fontSize = 12.sp
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // NĂºt Trust All
+                    TextButton(
+                        onClick = { filteredUntrusted.forEach { onTrust(it) } },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFF9800))
+                    ) {
+                        Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Trust táº¥t cáº£ (${filteredUntrusted.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
             }
             items(filteredUntrusted, key = { "untrusted_${it.pkgName}" }) { ext ->
                 ExtensionItem(
-                    name = ext.name,
-                    version = ext.versionName,
-                    lang = ext.lang,
-                    isNsfw = ext.isNsfw,
-                    isVBook = false,
-                    icon = null,
-                    isInstalled = false,
+                    extension = ext,
                     installStep = InstallStep.Pending,
                     isUpdate = false,
                     onClick = { onTrust(ext) },
-                    trustLabel = "TIN CẬY"
+                    onOpenDetails = { onDetail(ext) },
+                    trustLabel = "TIN Cáº¬Y"
                 )
             }
         }
@@ -659,7 +719,7 @@ fun ExtensionsTab(
         if (filteredInstalled.isNotEmpty()) {
             item(key = "header_installed") {
                 Text(
-                    "Đã cài đặt (${filteredInstalled.size})", 
+                    "ÄĂ£ cĂ i Ä‘áº·t (${filteredInstalled.size})", 
                     color = PrimaryOrange, 
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
@@ -671,26 +731,21 @@ fun ExtensionsTab(
                 val hasUpdate = availableVersion != null && availableVersion.versionCode > ext.versionCode
                 
                 ExtensionItem(
-                    name = ext.name,
-                    version = ext.versionName,
-                    lang = ext.lang,
-                    isNsfw = ext.isNsfw,
-                    isVBook = ext.isVBook,
-                    icon = ext.icon,
-                    isInstalled = true,
+                    extension = ext,
                     installStep = if (hasUpdate) installSteps[ext.pkgName] ?: InstallStep.Pending else null,
                     isUpdate = hasUpdate,
-                    onClick = if (hasUpdate) { { onInstall(availableVersion!!) } } else null,
-                    onUninstall = { onUninstall(ext.pkgName) }
+                    onClick = if (hasUpdate) { { onInstall(availableVersion!!) } } else { { onDetail(ext) } },
+                    onUninstall = { onUninstall(ext.pkgName) },
+                    onOpenDetails = { onDetail(ext) }
                 )
             }
         }
 
         filteredAvailable.forEach { (lang, extensions) ->
             val langName = when (lang.lowercase()) {
-                "vi" -> "Tiếng Việt"
+                "vi" -> "Tiáº¿ng Viá»‡t"
                 "en" -> "English"
-                "all" -> "Đa ngôn ngữ"
+                "all" -> "Äa ngĂ´n ngá»¯"
                 "ja" -> "Japanese"
                 "zh" -> "Chinese"
                 else -> lang.uppercase()
@@ -709,112 +764,39 @@ fun ExtensionsTab(
             items(extensions, key = { "available_${it.pkgName}" }) { ext ->
                 val step = installSteps[ext.pkgName] ?: InstallStep.Pending
                 ExtensionItem(
-                    name = ext.name,
-                    version = ext.versionName,
-                    lang = ext.lang,
-                    isNsfw = ext.isNsfw,
-                    isVBook = ext.isVBook,
-                    icon = ext.iconUrl,
-                    isInstalled = false,
+                    extension = ext,
                     installStep = step,
                     isUpdate = false,
                     onClick = { onDetail(ext) },
-                    onActionClick = { onInstall(ext) }
+                    onActionClick = { onInstall(ext) },
+                    onOpenDetails = { onDetail(ext) }
                 )
             }
         }
     }
 }
 
-@Composable
-fun ExtensionDetailDialog(
-    extension: Extension.Available,
-    installStep: InstallStep,
-    onInstall: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            if (installStep == InstallStep.Pending) {
-                Button(
-                    onClick = onInstall,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
-                ) {
-                    Text("Cài đặt")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Đóng", color = Color.White)
-            }
-        },
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(extension.name, color = Color.White)
-                Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    color = if (extension.isVBook) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color(0xFF2196F3).copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        if (extension.isVBook) "TRUYỆN CHỮ" else "MANGA",
-                        color = if (extension.isVBook) Color(0xFF4CAF50) else Color(0xFF2196F3),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
-                }
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text("Gói: ${extension.pkgName}", color = Color.Gray, fontSize = 12.sp)
-                Text("Phiên bản: ${extension.versionName}", color = Color.Gray, fontSize = 12.sp)
-                if (extension.author != null) {
-                    Text("Tác giả: ${extension.author}", color = Color.Gray, fontSize = 12.sp)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Các nguồn đi kèm:", color = Color.White, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                extension.sources.forEach { source ->
-                    Row(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Link, contentDescription = null, tint = PrimaryOrange, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(source.name, color = Color.LightGray, fontSize = 14.sp)
-                    }
-                }
-                if (extension.isNsfw) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("⚠️ Phần mở rộng này chứa nội dung 18+", color = Color.Red, fontSize = 12.sp)
-                }
-            }
-        },
-        containerColor = BackgroundDark
-    )
-}
 
 @Composable
 fun ExtensionItem(
-    name: String,
-    version: String,
-    lang: String?,
-    isNsfw: Boolean,
-    isVBook: Boolean,
-    icon: Any?,
-    isInstalled: Boolean,
+    extension: Extension,
     installStep: InstallStep?,
     isUpdate: Boolean = false,
     trustLabel: String? = null,
     onClick: (() -> Unit)?,
     onActionClick: (() -> Unit)? = null,
-    onUninstall: (() -> Unit)? = null
+    onUninstall: (() -> Unit)? = null,
+    onOpenDetails: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
+
+    val name = extension.name
+    val version = extension.versionName
+    val lang = extension.lang
+    val isNsfw = extension.isNsfw
+    val icon = (extension as? Extension.Installed)?.icon ?: (extension as? Extension.Available)?.iconUrl
+    val isInstalled = extension is Extension.Installed
 
     ListItem(
         modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier,
@@ -847,16 +829,23 @@ fun ExtensionItem(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(" • ", color = Color.Gray)
+                    Text(" â€¢ ", color = Color.Gray)
                 }
                 Text(version, color = Color.Gray, fontSize = 12.sp)
-                Text(" • ", color = Color.Gray)
-                Text(
-                    if (isVBook) "TRUYỆN CHỮ (JS)" else "MANGA (APK)",
-                    color = if (isVBook) Color(0xFF4CAF50) else Color(0xFF2196F3),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(" â€¢ ", color = Color.Gray)
+                val isJsExt = isJsExtension(extension)
+                val typeLabel = if (isJsExt) "JS" else "APK"
+                val typeColor = if (isJsExt) Color(0xFF64B5F6) else Color(0xFF2196F3)
+                val typeBg = if (isJsExt) Color(0xFF1565C0) else Color(0xFF0D47A1)
+                Surface(color = typeBg.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
+                    Text(
+                        typeLabel,
+                        color = typeColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = androidx.compose.ui.Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                    )
+                }
             }
         },
         leadingContent = {
@@ -895,11 +884,11 @@ fun ExtensionItem(
                         onClick = { action?.invoke() },
                         colors = ButtonDefaults.textButtonColors(contentColor = PrimaryOrange)
                     ) {
-                        Text(if (isUpdate) "CẬP NHẬT" else "CÀI ĐẶT", fontWeight = FontWeight.ExtraBold)
+                        Text(if (isUpdate) "Cáº¬P NHáº¬T" else "CĂ€I Äáº¶T", fontWeight = FontWeight.ExtraBold)
                     }
                     InstallStep.Downloading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), color = PrimaryOrange, strokeWidth = 2.dp)
-                    InstallStep.Installing -> Text("ĐANG CÀI...", color = PrimaryOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    InstallStep.SystemInstallStarted -> Text("XONG Ở HỆ THỐNG", color = PrimaryOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    InstallStep.Installing -> Text("ÄANG CĂ€I...", color = PrimaryOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    InstallStep.SystemInstallStarted -> Text("XONG á» Há»† THá»NG", color = PrimaryOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     else -> Icon(Icons.Default.Check, tint = Color.Green, contentDescription = null)
                 }
             } else if (isInstalled) {
@@ -913,7 +902,27 @@ fun ExtensionItem(
                         containerColor = BackgroundDark
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Gỡ cài đặt", color = Color.Red) },
+                            text = { Text("Chi tiáº¿t", color = Color.White) },
+                            onClick = {
+                                showMenu = false
+                                onOpenDetails?.invoke()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color.White) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("ThĂ´ng tin á»©ng dá»¥ng", color = Color.White) },
+                            onClick = {
+                                showMenu = false
+                                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = android.net.Uri.fromParts("package", extension.pkgName, null)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            },
+                            leadingIcon = { Icon(Icons.Default.Launch, contentDescription = null, tint = Color.White) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Gá»¡ cĂ i Ä‘áº·t", color = Color.Red) },
                             onClick = {
                                 showMenu = false
                                 onUninstall?.invoke()
@@ -940,7 +949,7 @@ fun SearchAppBar(
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text("Tìm phần mở rộng...", color = Color.Gray) },
+                placeholder = { Text("TĂ¬m pháº§n má»Ÿ rá»™ng...", color = Color.Gray) },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -968,3 +977,121 @@ fun SearchAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
     )
 }
+
+@Composable
+fun ExtensionDetailsDialog(
+    extension: Extension,
+    onDismiss: () -> Unit,
+    onUninstall: () -> Unit
+) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val icon = (extension as? Extension.Installed)?.icon ?: (extension as? Extension.Available)?.iconUrl
+                Box(modifier = Modifier.size(48.dp)) {
+                    if (icon != null) {
+                        AsyncImage(
+                            model = icon,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Extension, tint = Color.LightGray, contentDescription = null)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(extension.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(extension.pkgName.substringAfterLast("."), color = Color.Gray, fontSize = 12.sp)
+                }
+            }
+        },
+        text = {
+            Column {
+                val isJsExtDlg = isJsExtension(extension)
+                val extType = if (isJsExtDlg) "JS" else "APK"
+                val sourceCount = when (extension) {
+                    is Extension.Installed -> extension.sources.size
+                    is Extension.Available -> extension.sources.size
+                    else -> 0
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(extension.versionName, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("PhiĂªn báº£n", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(extension.lang?.uppercase() ?: "ALL", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("NgĂ´n ngá»¯", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(extType, color = if (isJsExtDlg) Color(0xFF64B5F6) else Color(0xFF2196F3), fontWeight = FontWeight.Bold)
+                        Text("Loáº¡i", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text("$sourceCount", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Nguá»“n", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+                if (extension.isNsfw) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(color = Color.Red.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text("â  Ná»™i dung ngÆ°á»i lá»›n (18+)", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                            modifier = androidx.compose.ui.Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (extension is Extension.Available) {
+                    extension.description?.takeIf { it.isNotBlank() }?.let { description ->
+                        Text("MĂ´ táº£", color = PrimaryOrange, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(description, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+
+                Text("Nguá»“n cung cáº¥p", color = PrimaryOrange, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                val sources = when(extension) {
+                    is Extension.Installed -> extension.sources.map { it.name }
+                    is Extension.Available -> extension.sources.map { it.name }
+                    else -> emptyList()
+                }
+                
+                if (sources.isEmpty()) {
+                    Text("KhĂ´ng tĂ¬m tháº¥y nguá»“n", color = Color.Gray, fontSize = 13.sp)
+                } else {
+                    sources.take(5).forEach { 
+                        Text("â€¢ $it", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                    }
+                    if (sources.size > 5) {
+                        Text("...vĂ  ${sources.size - 5} nguá»“n khĂ¡c", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (extension is Extension.Installed) {
+                TextButton(onClick = {
+                    onDismiss()
+                    onUninstall()
+                }) {
+                    Text("Gá»¡ cĂ i Ä‘áº·t", color = Color.Red)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("ÄĂ³ng")
+            }
+        },
+        containerColor = BackgroundDark
+    )
+}
+
+

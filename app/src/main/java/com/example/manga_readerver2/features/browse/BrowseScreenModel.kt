@@ -17,22 +17,36 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.launchIn
 import com.example.manga_readerver2.core.source.SourcePreferences
 import uy.kohesive.injekt.Injekt
+import com.example.manga_readerver2.core.source.SourceManager
 import uy.kohesive.injekt.api.get
+import android.content.Context
+import android.net.Uri
+import android.content.Intent
 
 class BrowseScreenModel(
     private val extensionManager: ExtensionManager = Injekt.get(),
+    private val sourceManager: SourceManager = Injekt.get<SourceManager>(),
     private val extensionApi: ExtensionApi = Injekt.get(),
     private val extensionInstaller: ExtensionInstaller = Injekt.get(),
     private val repoRepository: ExtensionRepoRepository = Injekt.get(),
-    private val sourcePreferences: SourcePreferences = Injekt.get()
+    private val sourcePreferences: SourcePreferences = Injekt.get(),
+    private val context: Context = Injekt.get()
 ) : ScreenModel {
 
     // Flow cho Extension đã cài đặt (từ Manager)
-    val installedExtensions: StateFlow<List<Extension.Installed>> = extensionManager.installedExtensions
-    val untrustedExtensions: StateFlow<List<Extension.Untrusted>> = extensionManager.untrustedExtensions
+    val installedExtensions: StateFlow<List<Extension.Installed>> = extensionManager.installedExtensionsFlow
+    val untrustedExtensions: StateFlow<List<Extension.Untrusted>> = extensionManager.untrustedExtensionsFlow
+
+    // Nguồn truyện (từ SourceManager)
+    val catalogueSources: StateFlow<List<eu.kanade.tachiyomi.source.CatalogueSource>> = sourceManager.catalogueSources.stateIn(
+        screenModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
+    )
 
     // Flow cho Extension có sẵn từ kho lưu trữ
-    val availableExtensions: StateFlow<List<Extension.Available>> = extensionManager.availableExtensions
+    private val _availableExtensions = MutableStateFlow<List<Extension.Available>>(emptyList())
+    val availableExtensions: StateFlow<List<Extension.Available>> = _availableExtensions.asStateFlow()
 
     // Trạng thái cài đặt cho từng extension
     private val _installSteps = MutableStateFlow<Map<String, InstallStep>>(emptyMap())
@@ -83,29 +97,15 @@ class BrowseScreenModel(
     fun refreshExtensions() {
         screenModelScope.launch {
             _isRefreshing.value = true
-            logcat(LogPriority.DEBUG) { "Bắt đầu làm mới danh sách extension..." }
-            
-            // Load local first
-            extensionManager.loadLocalExtensions()
-            
-            // Load from repos
-            val allAvailable = mutableListOf<Extension.Available>()
-            val repos = repoRepository.getAll()
-            logcat(LogPriority.DEBUG) { "Tìm thấy ${repos.size} repository trong database" }
-            
-            repos.forEach { repo ->
-                try {
-                    val exts = extensionApi.findExtensions(repo.baseUrl)
-                    logcat(LogPriority.DEBUG) { "Repo ${repo.baseUrl} trả về ${exts.size} extension" }
-                    allAvailable.addAll(exts)
-                } catch (e: Exception) {
-                    logcat(LogPriority.ERROR) { "Lỗi khi lấy extension từ ${repo.baseUrl}: ${e.message}" }
-                }
+            try {
+                var exts = extensionApi.findExtensions()
+                // Bỏ qua bộ lọc NSFW, luôn luôn hiện tất cả extension (cả 18+)
+                _availableExtensions.value = exts
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR) { "Lỗi khi lấy extension: ${e.message}" }
+            } finally {
+                _isRefreshing.value = false
             }
-            
-            logcat(LogPriority.DEBUG) { "Tổng cộng tìm thấy ${allAvailable.size} extension có sẵn" }
-            extensionManager.setAvailableExtensions(allAvailable.sortedBy { it.name })
-            _isRefreshing.value = false
         }
     }
 
@@ -119,15 +119,16 @@ class BrowseScreenModel(
                 // Chỉ reload ngay khi đã cài xong thật sự (JS/Internal APK).
                 // Với SystemInstallStarted, chờ package broadcast hoặc onScreenResumed().
                 if (step == InstallStep.Installed) {
-                    extensionManager.loadLocalExtensions()
+                    extensionManager.refreshInstalledExtensions()
                 }
             }
         }
     }
 
     fun onScreenResumed() {
+        // Sau khi người dùng quay lại từ system install dialog, refresh để hiện extension mới
         screenModelScope.launch {
-            extensionManager.loadLocalExtensions()
+            extensionManager.refreshInstalledExtensions()
         }
     }
 
@@ -152,24 +153,36 @@ class BrowseScreenModel(
     fun trustExtension(extension: Extension.Untrusted) {
         screenModelScope.launch {
             extensionManager.trust(extension)
+            // trust() đã tự reload extension vào installedExtensionMapFlow
+            // AndroidSourceManager sẽ tự động cập nhật qua collectLatest
         }
     }
 
-    fun importExtension(uri: android.net.Uri) {
-        screenModelScope.launch {
-            // Fix I3: Thêm loading feedback
-            _isRefreshing.value = true
-            try {
-                extensionManager.importJsExtension(uri)
-                // Fix I2: Refresh availableExtensions để update UI (kích hoạt thay đổi state)
-                refreshExtensions()
-            } finally {
-                _isRefreshing.value = false
-            }
-        }
-    }
 
     fun setLanguages(langs: Set<String>) {
         sourcePreferences.enabledLanguages.set(langs)
+    }
+
+    fun getJsExtensionsPath(): String {
+        return extensionManager.jsExtensionsBaseDir.absolutePath
+    }
+
+    fun refreshInstalledExtensions() {
+        screenModelScope.launch {
+            extensionManager.refreshInstalledExtensions()
+        }
+    }
+
+    fun updateLocalSourceUri(uriStr: String) {
+        val uri = Uri.parse(uriStr)
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        sourcePreferences.localSourceUri.set(uriStr)
     }
 }

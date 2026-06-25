@@ -1,6 +1,7 @@
 package com.example.manga_readerver2.source_js
 
 import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
@@ -22,6 +23,8 @@ class JsSource(
     private val scripts: Map<String, String>, // Function name to Script content
     val isNovel: Boolean = true // VBook default is novel
 ) : CatalogueSource {
+
+    override val supportsLatest: Boolean = scripts.containsKey("home")
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -53,7 +56,13 @@ class JsSource(
                 // Parse genres array or tag
                 val genresArray = data["genres"]?.asJsonArray()
                 val tagsStr = if (genresArray != null) {
-                    genresArray.mapNotNull { it.jsonObject["title"]?.jsonPrimitive?.content }.joinToString(", ")
+                    genresArray.mapNotNull {
+                        if (it is kotlinx.serialization.json.JsonObject) {
+                            it["title"]?.jsonPrimitive?.content
+                        } else if (it is kotlinx.serialization.json.JsonPrimitive && it.isString) {
+                            it.content
+                        } else null
+                    }.joinToString(", ")
                 } else {
                     data["tag"]?.jsonPrimitive?.content
                 }
@@ -114,13 +123,13 @@ class JsSource(
 
             if (textContent != null) {
                 // Đặt nội dung text vào imageUrl của Page[0] — ReaderScreenModel detect HTML/text từ đây
-                return listOf(Page(0, chapter.url, textContent))
+                return listOf(Page(0, chapter.url, "vbook-text://$textContent"))
             }
 
             // Case 3: Fallback — nếu kết quả là string thẳng (chứa HTML)
             val rawContent = jsonResult["data"]?.jsonPrimitive?.content
             if (rawContent != null) {
-                return listOf(Page(0, chapter.url, rawContent))
+                return listOf(Page(0, chapter.url, "vbook-text://$rawContent"))
             }
 
             emptyList()
@@ -129,15 +138,15 @@ class JsSource(
         }
     }
 
-    override suspend fun getPopularManga(page: Int): eu.kanade.tachiyomi.source.MangasPage {
-        val script = scripts["home"] ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
-        val homeResult = engine.execute(script, "execute", page.toString()) ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+    override suspend fun getPopularManga(page: Int): MangasPage {
+        val script = scripts["home"] ?: return MangasPage(emptyList(), false)
+        val homeResult = engine.execute(script, "execute", page.toString()) ?: return MangasPage(emptyList(), false)
 
         return try {
             val jsonResult = json.parseToJsonElement(homeResult).jsonObject
-            val data = jsonResult["data"]?.asJsonArray() ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            val data = jsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
             
-            if (data.isEmpty()) return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            if (data.isEmpty()) return MangasPage(emptyList(), false)
 
             // VBook home.js returns an array of Tabs. Take the first tab to use as "Popular"
             val firstTab = data[0].jsonObject
@@ -146,35 +155,35 @@ class JsSource(
 
             if (tabInput != null && tabScriptName != null) {
                 // Execute the tab script
-                val tabScript = scripts[tabScriptName.substringBeforeLast(".")] ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
-                val tabResult = engine.execute(tabScript, "execute", tabInput, page.toString()) ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+                val tabScript = scripts[tabScriptName.substringBeforeLast(".")] ?: return MangasPage(emptyList(), false)
+                val tabResult = engine.execute(tabScript, "execute", tabInput, page.toString()) ?: return MangasPage(emptyList(), false)
                 
                 val tabJsonResult = json.parseToJsonElement(tabResult).jsonObject
-                val mangasJson = tabJsonResult["data"]?.asJsonArray() ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+                val mangasJson = tabJsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
                 val hasNext = tabJsonResult["next"] != null && tabJsonResult["next"] !is kotlinx.serialization.json.JsonNull
 
                 val mangas = mangasJson.map { it.jsonObject }.map { o ->
                     SManga.create().apply {
                         url = o["link"]?.jsonPrimitive?.content ?: o["url"]?.jsonPrimitive?.content ?: ""
                         title = o["name"]?.jsonPrimitive?.content ?: o["title"]?.jsonPrimitive?.content ?: ""
-                        thumbnailUrl = o["cover"]?.jsonPrimitive?.content ?: ""
+                        thumbnail_url = o["cover"]?.jsonPrimitive?.content ?: ""
                     }
                 }
-                return eu.kanade.tachiyomi.source.MangasPage(mangas, hasNext)
+                return MangasPage(mangas, hasNext)
             } else {
                 // Fallback if home.js returned manga list directly
                 val mangas = data.map { it.jsonObject }.map { o ->
                     SManga.create().apply {
                         url = o["link"]?.jsonPrimitive?.content ?: o["url"]?.jsonPrimitive?.content ?: ""
                         title = o["name"]?.jsonPrimitive?.content ?: o["title"]?.jsonPrimitive?.content ?: ""
-                        thumbnailUrl = o["cover"]?.jsonPrimitive?.content ?: ""
+                        thumbnail_url = o["cover"]?.jsonPrimitive?.content ?: ""
                     }
                 }
                 val hasNext = jsonResult["next"] != null && jsonResult["next"] !is kotlinx.serialization.json.JsonNull
-                return eu.kanade.tachiyomi.source.MangasPage(mangas, hasNext)
+                return MangasPage(mangas, hasNext)
             }
         } catch (e: Exception) {
-            eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            MangasPage(emptyList(), false)
         }
     }
 
@@ -182,38 +191,38 @@ class JsSource(
         if (it is kotlinx.serialization.json.JsonArray) it else emptyList<kotlinx.serialization.json.JsonElement>()
     }
 
-    override suspend fun getSearchManga(page: Int, query: String, filters: eu.kanade.tachiyomi.source.model.FilterList): eu.kanade.tachiyomi.source.MangasPage {
-        val script = scripts["search"] ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
-        val result = engine.execute(script, "execute", query, page.toString()) ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+    override suspend fun getSearchManga(page: Int, query: String, filters: eu.kanade.tachiyomi.source.model.FilterList): MangasPage {
+        val script = scripts["search"] ?: return MangasPage(emptyList(), false)
+        val result = engine.execute(script, "execute", query, page.toString()) ?: return MangasPage(emptyList(), false)
 
         return try {
             val jsonResult = json.parseToJsonElement(result).jsonObject
-            val mangasJson = jsonResult["data"]?.asJsonArray() ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            val mangasJson = jsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
             val hasNext = jsonResult["next"] != null && jsonResult["next"] !is kotlinx.serialization.json.JsonNull
 
             val mangas = mangasJson.map { j -> j.jsonObject }.map { o ->
                 SManga.create().apply {
                     url = o["link"]?.jsonPrimitive?.content ?: o["url"]?.jsonPrimitive?.content ?: ""
                     title = o["name"]?.jsonPrimitive?.content ?: o["title"]?.jsonPrimitive?.content ?: ""
-                    thumbnailUrl = o["cover"]?.jsonPrimitive?.content ?: ""
+                    thumbnail_url = o["cover"]?.jsonPrimitive?.content ?: ""
                 }
             }
-            eu.kanade.tachiyomi.source.MangasPage(mangas, hasNext)
+            MangasPage(mangas, hasNext)
         } catch (e: Exception) {
-            eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            MangasPage(emptyList(), false)
         }
     }
 
-    override suspend fun getLatestUpdates(page: Int): eu.kanade.tachiyomi.source.MangasPage {
+    override suspend fun getLatestUpdates(page: Int): MangasPage {
         // Use getPopularManga logic but default to the second tab (usually "Mới Cập Nhật") if it exists
-        val script = scripts["home"] ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
-        val homeResult = engine.execute(script, "execute", page.toString()) ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+        val script = scripts["home"] ?: return MangasPage(emptyList(), false)
+        val homeResult = engine.execute(script, "execute", page.toString()) ?: return MangasPage(emptyList(), false)
 
         return try {
             val jsonResult = json.parseToJsonElement(homeResult).jsonObject
-            val data = jsonResult["data"]?.asJsonArray() ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            val data = jsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
             
-            if (data.isEmpty()) return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            if (data.isEmpty()) return MangasPage(emptyList(), false)
 
             // Try to use the second tab for "Latest", fallback to first tab
             val tabToUse = if (data.size > 1) data[1].jsonObject else data[0].jsonObject
@@ -221,26 +230,26 @@ class JsSource(
             val tabScriptName = tabToUse["script"]?.jsonPrimitive?.content
 
             if (tabInput != null && tabScriptName != null) {
-                val tabScript = scripts[tabScriptName.substringBeforeLast(".")] ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
-                val tabResult = engine.execute(tabScript, "execute", tabInput, page.toString()) ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+                val tabScript = scripts[tabScriptName.substringBeforeLast(".")] ?: return MangasPage(emptyList(), false)
+                val tabResult = engine.execute(tabScript, "execute", tabInput, page.toString()) ?: return MangasPage(emptyList(), false)
                 
                 val tabJsonResult = json.parseToJsonElement(tabResult).jsonObject
-                val mangasJson = tabJsonResult["data"]?.asJsonArray() ?: return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+                val mangasJson = tabJsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
                 val hasNext = tabJsonResult["next"] != null && tabJsonResult["next"] !is kotlinx.serialization.json.JsonNull
 
                 val mangas = mangasJson.map { it.jsonObject }.map { o ->
                     SManga.create().apply {
                         url = o["link"]?.jsonPrimitive?.content ?: o["url"]?.jsonPrimitive?.content ?: ""
                         title = o["name"]?.jsonPrimitive?.content ?: o["title"]?.jsonPrimitive?.content ?: ""
-                        thumbnailUrl = o["cover"]?.jsonPrimitive?.content ?: ""
+                        thumbnail_url = o["cover"]?.jsonPrimitive?.content ?: ""
                     }
                 }
-                return eu.kanade.tachiyomi.source.MangasPage(mangas, hasNext)
+                return MangasPage(mangas, hasNext)
             } else {
-                return eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+                return MangasPage(emptyList(), false)
             }
         } catch (e: Exception) {
-            eu.kanade.tachiyomi.source.MangasPage(emptyList(), false)
+            MangasPage(emptyList(), false)
         }
     }
 }

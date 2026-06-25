@@ -1,4 +1,4 @@
-package com.example.manga_readerver2.features.reader.components
+﻿package com.example.manga_readerver2.features.reader.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,7 +40,7 @@ fun TtsPlayerBar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Đang đọc nội dung...", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Äang Ä‘á»c ná»™i dung...", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Row {
                     IconButton(onClick = onShowSettings) {
                         Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -97,18 +98,18 @@ fun TtsSettingsDialog(
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Cài đặt Giọng Đọc", fontWeight = FontWeight.Bold) },
+        title = { Text("CĂ i Ä‘áº·t Giá»ng Äá»c", fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (availableVoices.isNotEmpty()) {
-                    Text("Giọng đọc", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("Giá»ng Ä‘á»c", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     Spacer(modifier = Modifier.height(4.dp))
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded }
                     ) {
                         OutlinedTextField(
-                            value = selectedVoice?.name?.substringAfterLast("-") ?: "Mặc định",
+                            value = selectedVoice?.name?.substringAfterLast("-") ?: "Máº·c Ä‘á»‹nh",
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -137,7 +138,7 @@ fun TtsSettingsDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                Text("Tốc độ đọc: ${(currentSpeed * 100).toInt()}%", fontSize = 14.sp)
+                Text("Tá»‘c Ä‘á»™ Ä‘á»c: ${(currentSpeed * 100).toInt()}%", fontSize = 14.sp)
                 Slider(
                     value = currentSpeed,
                     onValueChange = { speed: Float -> screenModel.updateTtsSpeed(speed) },
@@ -147,7 +148,7 @@ fun TtsSettingsDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Text("Độ cao giọng: ${(currentPitch * 100).toInt()}%", fontSize = 14.sp)
+                Text("Äá»™ cao giá»ng: ${(currentPitch * 100).toInt()}%", fontSize = 14.sp)
                 Slider(
                     value = currentPitch,
                     onValueChange = { pitch: Float -> screenModel.updateTtsPitch(pitch) },
@@ -163,3 +164,4 @@ fun TtsSettingsDialog(
         }
     )
 }
+

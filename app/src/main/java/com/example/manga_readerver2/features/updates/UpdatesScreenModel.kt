@@ -36,4 +36,28 @@ class UpdatesScreenModel(
             }
         }
     }
+
+    fun markAllRead() {
+        screenModelScope.launch {
+            _updates.value
+                .filter { !it.read }
+                .forEach { update ->
+                    val chapter = com.example.manga_readerver2.domain.model.Chapter(
+                        id = update.chapterId,
+                        mangaId = update.mangaId,
+                        url = "",
+                        name = update.chapterName,
+                        read = true,
+                        bookmark = update.bookmark,
+                        lastPageRead = update.lastPageRead,
+                        chapterNumber = update.chapterNumber,
+                        scanlator = update.scanlator,
+                        dateFetch = update.dateFetch,
+                        dateUpload = update.dateUpload,
+                        sourceOrder = update.sourceOrder
+                    )
+                    mangaRepository.updateChapterReadStatus(chapter)
+                }
+        }
+    }
 }

@@ -1,336 +1,370 @@
 package com.example.manga_readerver2.core.source
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import androidx.core.content.ContextCompat
-import eu.kanade.tachiyomi.source.Source
+import android.graphics.drawable.Drawable
 import com.example.manga_readerver2.source_dex.loader.ExtensionLoader
+import com.example.manga_readerver2.source_js.JsSource
 import com.example.manga_readerver2.source_js.loader.JsLoader
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import android.os.Build
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import logcat.logcat
 import okhttp3.OkHttpClient
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.io.File
+import java.util.Locale
 
+/**
+ * The manager of extensions installed as another apk which extend the available sources.
+ * Also manages JS extensions loaded from the filesystem.
+ */
 class ExtensionManager(
     private val context: Context,
-    private val client: OkHttpClient,
-    private val sourcePreferences: SourcePreferences
+    private val preferences: SourcePreferences = Injekt.get(),
+    private val trustExtension: TrustExtension = Injekt.get(),
 ) {
-    private val _installedExtensions = MutableStateFlow<List<Extension.Installed>>(emptyList())
-    val installedExtensions: StateFlow<List<Extension.Installed>> = _installedExtensions
 
-    private val _availableExtensions = MutableStateFlow<List<Extension.Available>>(emptyList())
-    val availableExtensions: StateFlow<List<Extension.Available>> = _availableExtensions
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private val _untrustedExtensions = MutableStateFlow<List<Extension.Untrusted>>(emptyList())
-    val untrustedExtensions: StateFlow<List<Extension.Untrusted>> = _untrustedExtensions
+    private val _isInitialized = MutableStateFlow(false)
+    val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
-    private val _sources = MutableStateFlow<List<Source>>(emptyList())
-    val sources: StateFlow<List<Source>> = _sources
+    private val api = ExtensionApi()
+    private val installer by lazy { ExtensionInstaller(context) }
 
-    private val _stubSources = MutableStateFlow<Map<Long, Extension.Available.AvailableSource>>(emptyMap())
-    val stubSources: StateFlow<Map<Long, Extension.Available.AvailableSource>> = _stubSources
+    private val iconMap = mutableMapOf<String, Drawable?>()
 
-    // Receiver scope dùng để launch coroutine bên trong BroadcastReceiver (Mihon pattern)
-    private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val installedExtensionMapFlow = MutableStateFlow(emptyMap<String, Extension.Installed>())
+    val installedExtensionsFlow = installedExtensionMapFlow.mapExtensions(scope)
 
-    private val packageReceiver = object : BroadcastReceiver() {
-        override fun onReceive(ctx: Context?, intent: Intent?) {
-            val data = intent?.data ?: return
-            val pkgName = data.schemeSpecificPart ?: return
-            
-            logcat(LogPriority.DEBUG) { "Hệ thống thông báo thay đổi package: ${intent.action} cho $pkgName" }
-            
-            // Debounce reloading to avoid multiple scans during bulk updates
-            receiverScope.launch {
-                delay(500) // Chờ một chút để hệ thống ổn định
-                loadLocalExtensions()
-            }
-        }
-    }
+    private val availableExtensionMapFlow = MutableStateFlow(emptyMap<String, Extension.Available>())
+    val availableExtensionsFlow = availableExtensionMapFlow.mapExtensions(scope)
+
+    private val untrustedExtensionMapFlow = MutableStateFlow(emptyMap<String, Extension.Untrusted>())
+    val untrustedExtensionsFlow = untrustedExtensionMapFlow.mapExtensions(scope)
+
+    // Thư mục chứa JS extensions (tương thích với JsLoader)
+    val jsExtensionsBaseDir: File get() = File(context.filesDir, "js_extensions")
 
     init {
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED)
-            addAction(Intent.ACTION_PACKAGE_REPLACED)
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addDataScheme("package")
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                initExtensions()
+            }
+            ExtensionInstallReceiver(InstallationListener()).register(context)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(packageReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(packageReceiver, filter)
-        }
-        
-        receiverScope.launch { loadLocalExtensions() }
     }
 
-    suspend fun loadLocalExtensions() {
-        withContext(Dispatchers.IO) {
-            val loadedExtensions = mutableListOf<Extension.Installed>()
-            val untrustedExtensions = mutableListOf<Extension.Untrusted>()
-            val loadedSources = mutableListOf<Source>()
+    fun getExtensionPackage(sourceId: Long): String? {
+        return installedExtensionsFlow.value.find { extension ->
+            extension.sources.any { it.id == sourceId }
+        }?.pkgName
+    }
 
-            // 1. Load APK Extensions (Mihon Style)
-            val trustedSignatures = sourcePreferences.trustedExtensions.get()
-            try {
-                val loadResults = ExtensionLoader.loadExtensions(context, trustedSignatures)
-                loadResults.forEach { result ->
-                    when (result) {
-                        is LoadResult.Success -> {
-                            logcat(LogPriority.DEBUG) { "Nạp thành công extension: ${result.extension.name} với ${result.extension.sources.size} sources" }
-                            loadedExtensions.add(result.extension)
-                            loadedSources.addAll(result.extension.sources)
-                        }
-                        is LoadResult.Untrusted -> {
-                            logcat(LogPriority.WARN) { "Extension chưa được tin cậy: ${result.extension.name}" }
-                            untrustedExtensions.add(result.extension)
-                        }
-                        is LoadResult.Error -> {
-                            logcat(LogPriority.ERROR) { "Lỗi khi nạp extension APK" }
-                        }
-                        else -> {}
+    fun getAppIconForSource(sourceId: Long): Drawable? {
+        val pkgName = getExtensionPackage(sourceId) ?: return null
+
+        return iconMap[pkgName] ?: iconMap.getOrPut(pkgName) {
+            ExtensionLoader.getExtensionPackageInfoFromPkgName(context, pkgName)?.applicationInfo
+                ?.loadIcon(context.packageManager)
+        }
+    }
+
+    private var availableExtensionsSourcesData: Map<Long, StubSource> = emptyMap()
+
+    private fun setupAvailableExtensionsSourcesDataMap(extensions: List<Extension.Available>) {
+        if (extensions.isEmpty()) return
+        availableExtensionsSourcesData = extensions
+            .flatMap { ext -> ext.sources.map { it.toStubSource() } }
+            .associateBy { it.id }
+    }
+
+    fun getSourceData(id: Long) = availableExtensionsSourcesData[id]
+
+    /**
+     * Load toàn bộ extensions: APK (trusted + untrusted) và JS.
+     * Chạy trên IO thread.
+     */
+    private suspend fun initExtensions() {
+        logcat(LogPriority.INFO) { "[ExtensionManager] Bắt đầu scan extensions..." }
+
+        // Lấy danh sách signature fingerprint từ các repo đã thêm
+        val repoRepository: com.example.manga_readerver2.domain.repository.ExtensionRepoRepository = Injekt.get()
+        val repoSignatures = repoRepository.getAll().map { it.signingKeyFingerprint }.filter { it.isNotBlank() }.toSet()
+
+        // --- APK extensions ---
+        val apkResults = ExtensionLoader.loadExtensions(context, repoSignatures)
+        logcat(LogPriority.INFO) { "[ExtensionManager] APK scan: ${apkResults.size} kết quả (Auto-trust ${repoSignatures.size} repo keys)" }
+
+        val trusted = mutableMapOf<String, Extension.Installed>()
+        val untrusted = mutableMapOf<String, Extension.Untrusted>()
+
+        for (result in apkResults) {
+            when (result) {
+                is LoadResult.Success -> {
+                    trusted[result.extension.pkgName] = result.extension
+                    logcat(LogPriority.INFO) {
+                        "[ExtensionManager] ✓ APK: ${result.extension.name} (${result.extension.pkgName})" +
+                        " — ${result.extension.sources.size} source(s)"
                     }
                 }
-            } catch (e: Throwable) {
-                logcat(LogPriority.ERROR) { "Error loading APK extensions: ${e.message}" }
-            }
-
-            // 2. Load JS Extensions (VBook Style)
-            val jsDir = File(context.filesDir, "extensions/js")
-            if (jsDir.exists()) {
-                jsDir.listFiles { file -> file.isDirectory }?.forEach { pluginDir ->
-                    try {
-                        val info = JsLoader.loadExtension(context, pluginDir, client)
-                        if (info != null) {
-                            val source = info.source
-                            val iconFile = File(pluginDir, "icon.png")
-                            val iconDrawable = if (iconFile.exists()) {
-                                android.graphics.drawable.BitmapDrawable(
-                                    context.resources,
-                                    android.graphics.BitmapFactory.decodeFile(iconFile.absolutePath)
-                                )
-                            } else null
-
-                            val vbookExt = Extension.Installed(
-                                name = source.name,
-                                pkgName = "vbook.${pluginDir.name}",
-                                versionName = info.versionName,
-                                versionCode = info.versionCode,
-                                libVersion = 1.0,
-                                lang = source.lang,
-                                isNsfw = info.isNsfw,
-                                pkgFactory = null,
-                                sources = listOf(source),
-                                icon = iconDrawable,
-                                isShared = false,
-                                isVBook = true,
-                                author = info.author
-                            )
-                            loadedExtensions.add(vbookExt)
-                            loadedSources.add(source)
-                        }
-                    } catch (e: Throwable) {
-                        logcat(LogPriority.ERROR) { "Error loading JS extension ${pluginDir.name}: ${e.message}\n${e.stackTraceToString()}" }
-
+                is LoadResult.Untrusted -> {
+                    untrusted[result.extension.pkgName] = result.extension
+                    logcat(LogPriority.WARN) {
+                        "[ExtensionManager] ⚠ UNTRUSTED APK: ${result.extension.name} (${result.extension.pkgName})" +
+                        " — cần Trust để dùng được. Vào tab 'Phần mở rộng' để trust."
                     }
                 }
-            }
-
-            // Snapshot list cũ trước khi update StateFlow.
-            // Phải update StateFlow TRƯỚC khi close engine — nếu close throw thì StateFlow vẫn được cập nhật.
-            val oldExtensions = _installedExtensions.value
-
-            _installedExtensions.value = loadedExtensions
-            _untrustedExtensions.value = untrustedExtensions
-            _sources.value = loadedSources
-            logcat { "Loaded ${loadedSources.size} sources from ${loadedExtensions.size} extensions." }
-
-            // Đóng engine cũ sau khi StateFlow đã được cập nhật để tránh leak native QuickJS heap
-            oldExtensions.forEach { ext ->
-                ext.sources.filterIsInstance<com.example.manga_readerver2.source_js.JsSource>()
-                    .forEach { jsSource ->
-                        try { jsSource.closeEngine() } catch (e: Throwable) {
-                            logcat(LogPriority.WARN) { "Failed to close JS engine: ${e.message}" }
-                        }
-                    }
-            }
-        }
-    }
-
-    fun setAvailableExtensions(extensions: List<Extension.Available>) {
-        _availableExtensions.value = extensions
-        _stubSources.value = extensions.flatMap { it.sources }.associateBy { it.id }
-    }
-
-    fun getSource(sourceId: Long): Source? {
-        return _sources.value.find { it.id == sourceId }
-    }
-
-    fun getStubSource(sourceId: Long): Extension.Available.AvailableSource? {
-        return _stubSources.value[sourceId]
-    }
-
-    suspend fun importJsExtension(uri: android.net.Uri) {
-        withContext(Dispatchers.IO) {
-            try {
-                val contentResolver = context.contentResolver
-                val fileName = getFileName(context, uri) ?: "imported_${System.currentTimeMillis()}.js"
-                val ext = fileName.substringAfterLast(".", "").lowercase()
-
-                if (ext == "zip") {
-                    // Import file ZIP — giải nén vào extensions/js/
-                    val pluginId = fileName.substringBeforeLast(".").replace(" ", "_").lowercase()
-                    val tmpFile = File(context.cacheDir, "import_${System.currentTimeMillis()}.zip")
-
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        tmpFile.outputStream().use { output -> input.copyTo(output) }
-                    }
-
-                    // Tái sử dụng logic giải nén từ ExtensionInstaller
-                    val pluginDir = File(context.filesDir, "extensions/js/$pluginId")
-                    if (pluginDir.exists()) pluginDir.deleteRecursively()
-                    pluginDir.mkdirs()
-
-                    java.util.zip.ZipFile(tmpFile).use { zip ->
-                        val entries = zip.entries().asSequence().toList()
-                        // Fix: lọc directory entries trước để tránh false "single root" detection
-                        val firstLevels = entries
-                            .filter { !it.isDirectory }
-                            .map { it.name.substringBefore("/") }
-                            .distinct()
-                        val hasSingleRoot = firstLevels.size == 1 && entries.any { it.name.contains("/") }
-                        val rootFolder = if (hasSingleRoot) firstLevels.first() else null
-
-                        entries.forEach { entry ->
-                            val entryName = if (hasSingleRoot && rootFolder != null && entry.name.startsWith("$rootFolder/")) {
-                                entry.name.substringAfter("$rootFolder/")
-                            } else {
-                                entry.name
-                            }
-                            if (entryName.isEmpty()) return@forEach
-
-                            val entryFile = File(pluginDir, entryName)
-                            if (entry.isDirectory) {
-                                entryFile.mkdirs()
-                            } else {
-                                entryFile.parentFile?.mkdirs()
-                                zip.getInputStream(entry).use { i -> entryFile.outputStream().use { o -> i.copyTo(o) } }
-                            }
-                        }
-                    }
-                    tmpFile.delete()
-                    logcat(LogPriority.DEBUG) { "Import ZIP extension thành công: $pluginId" }
-
-                } else {
-                    // Import file JS — tạo plugin đơn gản
-                    val pluginId = fileName.substringBeforeLast(".").replace(" ", "_").lowercase()
-                    val pluginDir = File(context.filesDir, "extensions/js/$pluginId")
-                    val srcDir = File(pluginDir, "src")
-                    if (!srcDir.exists()) srcDir.mkdirs()
-
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        File(srcDir, fileName).outputStream().use { output -> input.copyTo(output) }
-                    }
-
-                    // Tạo plugin.json mặc định nếu chưa có
-                    val pluginJsonFile = File(pluginDir, "plugin.json")
-                    if (!pluginJsonFile.exists()) {
-                        val safeName = fileName.substringBeforeLast(".")
-                        // Fix I1: Sử dụng fileName thay vì hardcode "home.js" hoặc tên không sanitize
-                        // Trong trường hợp này fileName chính là tên file đang được copy
-                        pluginJsonFile.writeText("""
-                            {
-                                "metadata": {
-                                    "name": "$safeName",
-                                    "author": "Imported",
-                                    "version": "1.0.0",
-                                    "language": "all",
-                                    "locale": "all"
-                                },
-                                "script": {
-                                    "home": "$fileName",
-                                    "search": "$fileName",
-                                    "detail": "$fileName",
-                                    "toc": "$fileName",
-                                    "chap": "$fileName"
-                                }
-                            }
-                        """.trimIndent())
-                    }
-                    logcat(LogPriority.DEBUG) { "Import JS extension thành công: $pluginId" }
-                }
-
-                loadLocalExtensions()
-            } catch (e: Exception) {
-                logcat(LogPriority.ERROR) { "Lỗi khi nhập extension: ${e.message}" }
-            }
-        }
-    }
-
-    private fun getFileName(context: Context, uri: android.net.Uri): String? {
-        var result: String? = null
-        if (uri.scheme == "content") {
-            val cursor = context.contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (index != -1) result = it.getString(index)
+                is LoadResult.Error -> {
+                    // Đã log chi tiết trong ExtensionLoader
                 }
             }
         }
-        if (result == null) {
-            result = uri.path
-            val cut = result?.lastIndexOf('/')
-            if (cut != null && cut != -1) {
-                result = result?.substring(cut + 1)
+
+        // --- JS extensions ---
+        val jsExtensions = loadJsExtensions()
+        logcat(LogPriority.INFO) { "[ExtensionManager] JS scan: ${jsExtensions.size} extension(s)" }
+        for (jsExt in jsExtensions) {
+            trusted[jsExt.pkgName] = jsExt
+            logcat(LogPriority.INFO) {
+                "[ExtensionManager] ✓ JS: ${jsExt.name} (${jsExt.pkgName})" +
+                " — ${jsExt.sources.size} source(s)"
             }
         }
+
+        val oldExtensions = installedExtensionMapFlow.value.values.toList()
+        installedExtensionMapFlow.value = trusted
+        untrustedExtensionMapFlow.value = untrusted
+
+        // Giải phóng QuickJS instance của các JS Source cũ để chống memory leak native
+        for (ext in oldExtensions) {
+            for (source in ext.sources) {
+                if (source is JsSource) {
+                    source.closeEngine()
+                }
+            }
+        }
+
+        logcat(LogPriority.INFO) {
+            "[ExtensionManager] Xong: ${trusted.size} trusted, ${untrusted.size} untrusted"
+        }
+
+        _isInitialized.value = true
+    }
+
+    /**
+     * Scan thư mục JS extensions và trả về danh sách Extension.Installed (fake APK wrapper cho JS).
+     * Mỗi subfolder trong jsExtensionsBaseDir là một plugin (có plugin.json bên trong).
+     */
+    private fun loadJsExtensions(): List<Extension.Installed> {
+        if (!jsExtensionsBaseDir.exists()) {
+            logcat(LogPriority.INFO) {
+                "[ExtensionManager] Không có thư mục JS extensions: ${jsExtensionsBaseDir.absolutePath}"
+            }
+            return emptyList()
+        }
+
+        val pluginDirs = jsExtensionsBaseDir.listFiles { f -> f.isDirectory } ?: return emptyList()
+        logcat(LogPriority.INFO) {
+            "[ExtensionManager] Tìm thấy ${pluginDirs.size} thư mục JS plugin trong ${jsExtensionsBaseDir.absolutePath}"
+        }
+
+        val client: OkHttpClient = Injekt.get()
+        val result = mutableListOf<Extension.Installed>()
+
+        for (dir in pluginDirs) {
+            val info = JsLoader.loadExtension(context, dir, client)
+            if (info == null) {
+                logcat(LogPriority.WARN) {
+                    "[ExtensionManager] JS plugin bị lỗi, bỏ qua: ${dir.name}"
+                }
+                continue
+            }
+
+            // Sử dụng trực tiếp tên thư mục làm pkgName để khớp với danh sách trên Repo
+            val pkgName = dir.name
+
+            val installed = Extension.Installed(
+                name = info.source.name,
+                pkgName = pkgName,
+                versionName = info.versionName,
+                versionCode = info.versionCode,
+                libVersion = 1.5, // JS extensions dùng version ổn định
+                lang = (info.source as? JsSource)?.lang ?: "all",
+                isNsfw = info.isNsfw,
+                author = info.author,
+                pkgFactory = null,
+                sources = listOf(info.source),
+                icon = null,
+                isShared = false,
+            )
+            result.add(installed)
+        }
+
         return result
     }
 
-    suspend fun trust(extension: Extension.Untrusted) {
-        val trustKey = "${extension.pkgName}:${extension.versionCode}:${extension.signatureHash}"
-        val currentTrusted = sourcePreferences.trustedExtensions.get()
-        sourcePreferences.trustedExtensions.set(currentTrusted + trustKey)
-        loadLocalExtensions()
+    /**
+     * Force rescan toàn bộ extensions. Gọi sau khi install/trust/uninstall.
+     */
+    fun refreshInstalledExtensions() {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                initExtensions()
+            }
+        }
     }
 
-    suspend fun uninstallExtension(pkgName: String) {
-        withContext(Dispatchers.IO) {
-            try {
-                if (pkgName.startsWith("vbook.")) {
-                    val pluginId = pkgName.substringAfter("vbook.")
-                    val pluginDir = File(context.filesDir, "extensions/js/$pluginId")
-                    if (pluginDir.exists()) {
-                        pluginDir.deleteRecursively()
-                    }
-                } else {
-                    // 1. Xóa file APK nội bộ nếu có
-                    val privateExtDir = File(context.filesDir, "exts")
-                    val privateFile = File(privateExtDir, "$pkgName.apk")
-                    if (privateFile.exists()) {
-                        privateFile.delete()
-                        logcat(LogPriority.DEBUG) { "Đã xóa file APK nội bộ: $pkgName" }
-                    }
-
-                    // 2. Gọi gỡ cài đặt hệ thống (nếu đã cài vào hệ thống)
-                    val intent = android.content.Intent(android.content.Intent.ACTION_DELETE).apply {
-                        data = android.net.Uri.parse("package:$pkgName")
-                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    context.startActivity(intent)
-                }
-            } catch (e: Exception) {
-                logcat(LogPriority.ERROR) { "Lỗi khi gỡ cài đặt extension $pkgName: ${e.message}" }
-            }
-            loadLocalExtensions()
+    suspend fun findAvailableExtensions() {
+        val extensions: List<Extension.Available> = try {
+            api.findExtensions()
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR) { "Failed to find available extensions: ${e.message}" }
+            return
         }
+
+        availableExtensionMapFlow.value = extensions.associateBy { it.pkgName }
+        updatedInstalledExtensionsStatuses(extensions)
+        setupAvailableExtensionsSourcesDataMap(extensions)
+    }
+
+    private fun updatedInstalledExtensionsStatuses(availableExtensions: List<Extension.Available>) {
+        if (availableExtensions.isEmpty()) return
+
+        val installedExtensionsMap = installedExtensionMapFlow.value.toMutableMap()
+        var changed = false
+        for ((pkgName, extension) in installedExtensionsMap) {
+            val availableExt = availableExtensions.find { it.pkgName == pkgName }
+
+            if (availableExt == null && !extension.isObsolete) {
+                installedExtensionsMap[pkgName] = extension.copy(isObsolete = true)
+                changed = true
+            } else if (availableExt != null) {
+                val hasUpdate = (availableExt.versionCode > extension.versionCode || availableExt.libVersion > extension.libVersion)
+                if (extension.hasUpdate != hasUpdate) {
+                    installedExtensionsMap[pkgName] = extension.copy(
+                        hasUpdate = hasUpdate,
+                        repoUrl = availableExt.repoUrl,
+                    )
+                    changed = true
+                }
+            }
+        }
+        if (changed) {
+            installedExtensionMapFlow.value = installedExtensionsMap
+        }
+    }
+
+    fun installExtension(extension: Extension.Available): Flow<InstallStep> {
+        return installer.downloadAndInstall(extension).onEach { step ->
+            if (step == InstallStep.Installed && extension.apkName.endsWith(".zip", ignoreCase = true)) {
+                refreshInstalledExtensions()
+            }
+        }
+    }
+
+    fun updateExtension(extension: Extension.Installed): Flow<InstallStep> {
+        val availableExt = availableExtensionMapFlow.value[extension.pkgName] ?: return emptyFlow()
+        return installExtension(availableExt)
+    }
+
+    fun cancelInstallUpdateExtension(extension: Extension) {
+        // Not implemented in my simple installer yet, but following Mihon's signature
+    }
+
+    fun uninstallExtension(pkgName: String) {
+        val extension = installedExtensionMapFlow.value[pkgName]
+        if (extension != null && extension.sources.any { it is JsSource }) {
+            scope.launch(Dispatchers.IO) {
+                extension.sources.forEach { if (it is JsSource) it.closeEngine() }
+                
+                val pluginDirs = jsExtensionsBaseDir.listFiles { f -> f.isDirectory } ?: emptyArray()
+                for (dir in pluginDirs) {
+                    if (dir.name == pkgName) {
+                        dir.deleteRecursively()
+                        break
+                    }
+                }
+                
+                withContext(Dispatchers.Main) {
+                    installedExtensionMapFlow.value -= pkgName
+                }
+            }
+            return
+        }
+        installer.uninstallApk(pkgName)
+    }
+
+    suspend fun trust(extension: Extension.Untrusted) {
+        trustExtension.trust(extension.pkgName, extension.versionCode, extension.signatureHash)
+        untrustedExtensionMapFlow.value -= extension.pkgName
+        // Reload extension từ APK sau khi trust để nó vào installedExtensionMapFlow
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                ExtensionLoader.loadExtensionFromPkgName(context, extension.pkgName)
+            }
+            if (result is LoadResult.Success) {
+                installedExtensionMapFlow.value += (result.extension.pkgName to result.extension)
+                logcat(LogPriority.INFO) {
+                    "[ExtensionManager] ✓ Trust & Load: ${result.extension.name} — ${result.extension.sources.size} source(s)"
+                }
+            } else {
+                logcat(LogPriority.ERROR) {
+                    "[ExtensionManager] Trust thành công nhưng load lại thất bại: ${extension.pkgName}, result=$result"
+                }
+            }
+        }
+    }
+
+    private inner class InstallationListener : ExtensionInstallReceiver.Listener {
+        override fun onExtensionInstalled(extension: Extension.Installed) {
+            installedExtensionMapFlow.value += (extension.pkgName to extension)
+            logcat(LogPriority.INFO) { "[ExtensionManager] Cài mới: ${extension.name}" }
+        }
+
+        override fun onExtensionUpdated(extension: Extension.Installed) {
+            installedExtensionMapFlow.value += (extension.pkgName to extension)
+            logcat(LogPriority.INFO) { "[ExtensionManager] Cập nhật: ${extension.name}" }
+        }
+
+        override fun onExtensionUntrusted(extension: Extension.Untrusted) {
+            scope.launch {
+                val repoRepository: com.example.manga_readerver2.domain.repository.ExtensionRepoRepository = Injekt.get()
+                val repoSignatures = repoRepository.getAll().map { it.signingKeyFingerprint }.filter { it.isNotBlank() }.toSet()
+                
+                if (extension.signatureHash in repoSignatures) {
+                    logcat(LogPriority.INFO) { "[ExtensionManager] Tự động tin cậy extension từ repo: ${extension.name}" }
+                    trust(extension)
+                } else {
+                    installedExtensionMapFlow.value -= extension.pkgName
+                    untrustedExtensionMapFlow.value += (extension.pkgName to extension)
+                    logcat(LogPriority.WARN) {
+                        "[ExtensionManager] Extension mới cài chưa được trust: ${extension.name} — vào tab Phần mở rộng để Trust"
+                    }
+                }
+            }
+        }
+
+        override fun onPackageUninstalled(pkgName: String) {
+            installedExtensionMapFlow.value -= pkgName
+            untrustedExtensionMapFlow.value -= pkgName
+        }
+    }
+
+    private fun <T : Extension> StateFlow<Map<String, T>>.mapExtensions(scope: CoroutineScope): StateFlow<List<T>> {
+        return map { it.values.toList() }.stateIn(scope, SharingStarted.Lazily, value.values.toList())
     }
 }

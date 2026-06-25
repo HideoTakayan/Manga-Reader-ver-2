@@ -35,16 +35,6 @@ dependencies {
     implementation(libs.rxandroid)
     implementation(libs.okhttp)
     implementation(libs.jsoup)
+    implementation(libs.injekt)
+    implementation("androidx.preference:preference-ktx:1.2.1")
 }
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-package com.example.manga_readerver2.features.settings
+﻿package com.example.manga_readerver2.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,10 +32,10 @@ class SettingsDetailScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Cài đặt", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("CĂ i Ä‘áº·t", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -49,45 +50,57 @@ class SettingsDetailScreen : Screen {
             ) {
                 SettingsCategoryItem(
                     icon = Icons.Default.Palette,
-                    title = "Hiển thị",
-                    subtitle = "Chủ đề, định dạng ngày tháng",
-                    onClick = { /* TODO */ }
+                    title = "Hiá»ƒn thá»‹",
+                    subtitle = "Giao diá»‡n, ngĂ y thĂ¡ng",
+                    onClick = { navigator.push(DisplaySettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.CollectionsBookmark,
-                    title = "Thư viện",
-                    subtitle = "Cập nhật, danh mục, nhãn",
-                    onClick = { /* TODO */ }
+                    title = "ThÆ° viá»‡n",
+                    subtitle = "Cáº­p nháº­t, danh má»¥c, nhĂ£n",
+                    onClick = { navigator.push(LibrarySettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.ChromeReaderMode,
-                    title = "Trình đọc",
-                    subtitle = "Chế độ đọc, điều hướng, hiển thị",
+                    title = "TrĂ¬nh Ä‘á»c",
+                    subtitle = "Cháº¿ Ä‘á»™ Ä‘á»c, Ä‘iá»u hÆ°á»›ng, hiá»ƒn thá»‹",
                     onClick = { navigator.push(ReaderSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Download,
-                    title = "Tải xuống",
-                    subtitle = "Vị trí tải, tự động xóa",
-                    onClick = { /* TODO */ }
+                    title = "Táº£i xuá»‘ng",
+                    subtitle = "Vá»‹ trĂ­ táº£i, tá»± Ä‘á»™ng xĂ³a",
+                    onClick = { navigator.push(DownloadSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Explore,
-                    title = "Duyệt",
-                    subtitle = "Nguồn truyện, tiện ích mở rộng",
+                    title = "Duyá»‡t",
+                    subtitle = "Nguá»“n truyá»‡n, tiá»‡n Ă­ch má»Ÿ rá»™ng",
                     onClick = { navigator.push(BrowseSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Security,
-                    title = "Bảo mật",
-                    subtitle = "Khóa ứng dụng, vân tay",
-                    onClick = { /* TODO */ }
+                    title = "Báº£o máº­t",
+                    subtitle = "KhĂ³a á»©ng dá»¥ng, vĂ¢n tay",
+                    onClick = { navigator.push(SecuritySettingsScreen()) }
+                )
+                SettingsCategoryItem(
+                    icon = Icons.Default.Sync,
+                    title = "Theo dĂµi",
+                    subtitle = "MyAnimeList, AniList",
+                    onClick = { navigator.push(TrackSettingsScreen()) }
+                )
+                SettingsCategoryItem(
+                    icon = Icons.Default.Storage,
+                    title = "Dá»¯ liá»‡u vĂ  Sao lÆ°u",
+                    subtitle = "Sao lÆ°u thÆ° viá»‡n, xĂ³a bá»™ nhá»› Ä‘á»‡m",
+                    onClick = { navigator.push(DataSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Code,
-                    title = "Nâng cao",
-                    subtitle = "Dọn dẹp database, log",
-                    onClick = { /* TODO */ }
+                    title = "NĂ¢ng cao",
+                    subtitle = "Dá»n dáº¹p database, log",
+                    onClick = { navigator.push(AdvancedSettingsScreen()) }
                 )
             }
         }
@@ -118,3 +131,5 @@ fun SettingsCategoryItem(
         }
     }
 }
+
+

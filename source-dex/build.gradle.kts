@@ -32,6 +32,8 @@ dependencies {
     implementation(project(":core"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.logcat)
+    implementation(libs.injekt)
+    implementation(libs.kotlinx.coroutines.android)
 }
 
 

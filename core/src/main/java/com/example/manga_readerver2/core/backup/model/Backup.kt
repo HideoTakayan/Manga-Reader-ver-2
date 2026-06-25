@@ -2,8 +2,18 @@ package com.example.manga_readerver2.core.backup.model
 
 import kotlinx.serialization.Serializable
 
+/** Preview hiển thị cho user trước khi confirm restore */
+data class BackupPreview(
+    val mangaCount: Int,
+    val chapterCount: Int,
+    val categoryCount: Int,
+    val isValid: Boolean,
+    val errorMessage: String? = null
+)
+
 @Serializable
 data class Backup(
+    val version: Int = 1,
     val backupManga: List<BackupManga>,
     val backupCategories: List<BackupCategory> = emptyList()
 )

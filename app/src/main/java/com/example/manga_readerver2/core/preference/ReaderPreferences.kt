@@ -12,6 +12,7 @@ class ReaderPreferences(preferenceStore: PreferenceStore) {
     val trueColor = preferenceStore.getBoolean("true_color", false)
     val volumeKeysNavigation = preferenceStore.getBoolean("volume_keys_navigation", false)
     val readerTapNavigation = preferenceStore.getBoolean("reader_tap_navigation", true)
+    val autoScrollSpeed = preferenceStore.getFloat("auto_scroll_speed", 1.0f)
 
     // Text Settings
     val fontSize = preferenceStore.getFloat("text_font_size", 18f)
@@ -24,11 +25,32 @@ class ReaderPreferences(preferenceStore: PreferenceStore) {
     val fullscreen = preferenceStore.getBoolean("fullscreen", true)
     val colorFilterMode = preferenceStore.getInt("color_filter_mode", 0) // 0: None, 1: Grayscale, 2: Inverted, 3: Sepia
     val webtoonSidePadding = preferenceStore.getInt("webtoon_side_padding", 0)
+    val cropBorders = preferenceStore.getBoolean("crop_borders", false)
 
     // TTS Settings
     val ttsVoice = preferenceStore.getString("tts_voice", "")
     val ttsPitch = preferenceStore.getFloat("tts_pitch", 1.0f)
     val ttsSpeechRate = preferenceStore.getFloat("tts_speech_rate", 1.0f)
+    val customColors = preferenceStore.getBoolean("custom_colors", false)
+    val customColorPrimary = preferenceStore.getInt("custom_color_primary", 0xFF6200EE.toInt())
+
+    // Custom Color Filter Settings
+    val customColorFilter = preferenceStore.getBoolean("custom_color_filter", false)
+    val customColorFilterColor = preferenceStore.getInt("custom_color_filter_color", 0xFFB300) // Orange
+    val customColorFilterAlpha = preferenceStore.getFloat("custom_color_filter_alpha", 0.2f)
+    val customColorFilterBlendMode = preferenceStore.getInt("custom_color_filter_blend_mode", 0) // 0: Multiply, 1: Screen, 2: Overlay
+    
+    // Advanced Image Filters (Mihon-style)
+    val invertColors = preferenceStore.getBoolean("invert_colors", false)
+    val grayscale = preferenceStore.getBoolean("grayscale", false)
+    
+    // Hardware Navigation
+    val volumeKeyNavigation = preferenceStore.getBoolean("volume_key_navigation", false)
+    
+    // Dual Page (Landscape)
+    val dualPage = preferenceStore.getBoolean("dual_page", false)
+    
+    // Privacy Settings
     val incognitoMode = preferenceStore.getBoolean("incognito_mode", false)
     val autoDownloadAmount = preferenceStore.getInt("auto_download_amount", 0)
 

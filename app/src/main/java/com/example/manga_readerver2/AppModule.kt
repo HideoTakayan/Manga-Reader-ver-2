@@ -8,12 +8,13 @@ import com.example.manga_readerver2.core.download.DownloadManager
 import com.example.manga_readerver2.core.download.DownloadStore
 import com.example.manga_readerver2.core.source.ExtensionApi
 import eu.kanade.tachiyomi.network.NetworkHelper
-import com.example.manga_readerver2.core.source.ExtensionInstaller
-import com.example.manga_readerver2.core.source.ExtensionManager
-import com.example.manga_readerver2.core.source.SourcePreferences
+import com.example.manga_readerver2.core.source.*
 import com.example.manga_readerver2.core.preference.ReaderPreferences
 import com.example.manga_readerver2.core.preference.LibraryPreferences
 import com.example.manga_readerver2.core.preference.GeneralPreferences
+import com.example.manga_readerver2.core.security.SecurityPreferences
+import com.example.manga_readerver2.core.track.TrackPreferences
+import com.example.manga_readerver2.core.track.AniListManager
 import com.example.manga_readerver2.core.utils.PreferenceStore
 import com.example.manga_readerver2.core.utils.FileManager
 import com.example.manga_readerver2.core.utils.UserAgentInterceptor
@@ -31,6 +32,7 @@ import uy.kohesive.injekt.api.addSingleton
 import uy.kohesive.injekt.api.addSingletonFactory
 import uy.kohesive.injekt.api.get
 import java.util.concurrent.TimeUnit
+import kotlinx.serialization.json.Json
 
 class AppModule(val app: Application) : InjektModule {
 
@@ -40,11 +42,21 @@ class AppModule(val app: Application) : InjektModule {
         addSingleton<Context>(app)
 
         addSingletonFactory {
+            Json {
+                ignoreUnknownKeys = true
+                explicitNulls = false
+            }
+        }
+
+        addSingletonFactory {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BASIC
             }
+            val cookieJar = com.example.manga_readerver2.core.utils.AndroidCookieJar()
             OkHttpClient.Builder()
+                .cookieJar(cookieJar)
                 .addInterceptor(UserAgentInterceptor())
+                .addInterceptor(com.example.manga_readerver2.core.utils.CloudflareInterceptor(app))
                 .addInterceptor(logging)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -90,7 +102,31 @@ class AppModule(val app: Application) : InjektModule {
         }
 
         addSingletonFactory {
+            SecurityPreferences(get())
+        }
+
+        addSingletonFactory {
+            TrackPreferences(get())
+        }
+
+        addSingletonFactory {
+            LocalSource()
+        }
+
+        addSingletonFactory {
+            AniListManager()
+        }
+
+        addSingletonFactory {
             LibraryPreferences(get())
+        }
+
+        addSingletonFactory {
+            com.example.manga_readerver2.core.preference.DownloadPreferences(get())
+        }
+
+        addSingletonFactory {
+            com.example.manga_readerver2.core.preference.DisplayPreferences(get())
         }
 
         addSingletonFactory {
@@ -102,19 +138,27 @@ class AppModule(val app: Application) : InjektModule {
         }
 
         addSingletonFactory {
-            ExtensionApi(get())
+            ExtensionApi()
         }
 
         addSingletonFactory {
-            NetworkHelper(app)
+            eu.kanade.tachiyomi.network.NetworkHelper(app, get<OkHttpClient>())
         }
 
         addSingletonFactory {
-            ExtensionInstaller(app, get(), get())
+            ExtensionInstaller(app)
+        }
+
+        addSingletonFactory {
+            TrustExtension(get())
         }
 
         addSingletonFactory {
             ExtensionManager(app, get(), get())
+        }
+
+        addSingletonFactory<SourceManager> {
+            AndroidSourceManager(get())
         }
 
         addSingletonFactory {
@@ -135,6 +179,14 @@ class AppModule(val app: Application) : InjektModule {
 
         addSingletonFactory {
             com.example.manga_readerver2.core.backup.BackupManager(app, get())
+        }
+
+        addSingletonFactory {
+            ExtensionRepoService()
+        }
+
+        addSingletonFactory {
+            com.example.manga_readerver2.domain.usecase.MigrateMangaUseCase(get())
         }
     }
 }

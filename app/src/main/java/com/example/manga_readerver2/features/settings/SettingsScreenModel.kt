@@ -24,6 +24,10 @@ class SettingsScreenModel : ScreenModel {
 
     val downloadedOnly = generalPreferences.downloadedOnly.asFlow()
     val incognitoMode = generalPreferences.incognitoMode.asFlow()
+    
+    val autoBackup = generalPreferences.autoBackup.asFlow()
+    val autoBackupFrequency = generalPreferences.autoBackupFrequency.asFlow()
+    val maxAutoBackups = generalPreferences.maxAutoBackups.asFlow()
 
     val downloadQueueCount = downloadManager.queueState
         .map { it.size }
@@ -39,6 +43,26 @@ class SettingsScreenModel : ScreenModel {
 
     fun setIncognitoMode(enabled: Boolean) {
         generalPreferences.incognitoMode.set(enabled)
+    }
+
+    fun setAutoBackup(enabled: Boolean) {
+        generalPreferences.autoBackup.set(enabled)
+        com.example.manga_readerver2.core.backup.AutoBackupJob.setupTask(
+            context, enabled, generalPreferences.autoBackupFrequency.get()
+        )
+    }
+
+    fun setAutoBackupFrequency(hours: Int) {
+        generalPreferences.autoBackupFrequency.set(hours)
+        if (generalPreferences.autoBackup.get()) {
+            com.example.manga_readerver2.core.backup.AutoBackupJob.setupTask(
+                context, true, hours
+            )
+        }
+    }
+
+    fun setMaxAutoBackups(max: Int) {
+        generalPreferences.maxAutoBackups.set(max)
     }
 
     private fun updateCacheSize() {
@@ -72,6 +96,37 @@ class SettingsScreenModel : ScreenModel {
             val success = backupManager.createBackup(uri)
             _message.value = if (success) "Đã tạo bản sao lưu thành công" else "Lỗi khi tạo bản sao lưu"
         }
+    }
+
+    // Backup preview state — hiện dialog trước khi restore
+    private val _backupPreview = MutableStateFlow<com.example.manga_readerver2.core.backup.model.BackupPreview?>(null)
+    val backupPreview: StateFlow<com.example.manga_readerver2.core.backup.model.BackupPreview?> = _backupPreview.asStateFlow()
+
+    private var pendingRestoreUri: android.net.Uri? = null
+
+    /** Bước 1: validate file và hiện preview dialog */
+    fun previewRestoreBackup(uri: android.net.Uri) {
+        pendingRestoreUri = uri
+        screenModelScope.launch {
+            val preview = backupManager.previewBackup(uri)
+            _backupPreview.value = preview
+        }
+    }
+
+    /** Bước 2: user confirm → thực hiện restore */
+    fun confirmRestoreBackup() {
+        val uri = pendingRestoreUri ?: return
+        _backupPreview.value = null
+        screenModelScope.launch {
+            val success = backupManager.restoreBackup(uri)
+            _message.value = if (success) "Đã khôi phục dữ liệu thành công" else "Lỗi khi khôi phục dữ liệu"
+            pendingRestoreUri = null
+        }
+    }
+
+    fun dismissBackupPreview() {
+        _backupPreview.value = null
+        pendingRestoreUri = null
     }
 
     fun restoreBackup(uri: android.net.Uri) {

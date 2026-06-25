@@ -4,6 +4,7 @@ package com.example.manga_readerver2.features.reader.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -120,10 +121,16 @@ private fun ReadingModeTab(isTextReader: Boolean, screenModel: ReaderScreenModel
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ReadingModeButton("Đọc ngang", readingMode == ReadingMode.HORIZONTAL) {
-                    screenModel.setReadingMode(ReadingMode.HORIZONTAL)
+                ReadingModeButton("Phải sang Trái", readingMode == ReadingMode.RIGHT_TO_LEFT) {
+                    screenModel.setReadingMode(ReadingMode.RIGHT_TO_LEFT)
                 }
-                ReadingModeButton("Đọc dọc", readingMode == ReadingMode.VERTICAL) {
+                ReadingModeButton("Trái sang Phải", readingMode == ReadingMode.LEFT_TO_RIGHT) {
+                    screenModel.setReadingMode(ReadingMode.LEFT_TO_RIGHT)
+                }
+                ReadingModeButton("Cuộn Dọc", readingMode == ReadingMode.WEBTOON) {
+                    screenModel.setReadingMode(ReadingMode.WEBTOON)
+                }
+                ReadingModeButton("Lật Dọc", readingMode == ReadingMode.VERTICAL) {
                     screenModel.setReadingMode(ReadingMode.VERTICAL)
                 }
             }
@@ -238,20 +245,6 @@ fun PreciseSettingItem(
                 Icon(Icons.Default.AddCircleOutline, contentDescription = "Increase", tint = PrimaryOrange)
             }
         }
-        
-        Surface(
-            onClick = { /* TODO: Custom Add */ },
-            color = Color.White.copy(alpha = 0.05f),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-        ) {
-            Text(
-                "Thêm",
-                color = Color.White,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-            )
-        }
     }
 }
 
@@ -313,6 +306,8 @@ private fun GeneralSettingsTab(isTextReader: Boolean, screenModel: ReaderScreenM
     val keepScreenOn by screenModel.keepScreenOn.collectAsState()
     val fullscreen by screenModel.fullscreen.collectAsState()
     val incognitoMode by screenModel.incognitoMode.collectAsState()
+    val volumeKeyNavigation by screenModel.volumeKeyNavigation.collectAsState()
+    val dualPage by screenModel.dualPage.collectAsState()
     
     Column {
         HeadingItem("Cài đặt chung")
@@ -331,13 +326,33 @@ private fun GeneralSettingsTab(isTextReader: Boolean, screenModel: ReaderScreenM
             checked = incognitoMode, 
             onClick = { screenModel.setIncognitoMode(!incognitoMode) }
         )
+        CheckboxItem(
+            label = "Chuyển trang bằng phím Âm lượng", 
+            checked = volumeKeyNavigation, 
+            onClick = { screenModel.setVolumeKeyNavigation(!volumeKeyNavigation) }
+        )
 
         if (!isTextReader) {
             val cropBorders by screenModel.cropBorders.collectAsState()
+            val webtoonSidePadding by screenModel.webtoonSidePadding.collectAsState()
+            
             CheckboxItem(
-                label = "Cắt viền ảnh", 
+                label = "Cắt khoảng trắng viền ảnh", 
                 checked = cropBorders, 
                 onClick = { screenModel.setCropBorders(!cropBorders) }
+            )
+            CheckboxItem(
+                label = "Trang đôi (Cho màn hình ngang/Tablet)", 
+                checked = dualPage, 
+                onClick = { screenModel.setDualPage(!dualPage) }
+            )
+            SliderItem(
+                label = "Khoảng cách lề 2 bên (Webtoon)",
+                value = webtoonSidePadding.toFloat(),
+                onValueChange = { screenModel.setWebtoonSidePadding(it.toInt()) },
+                valueRange = 0f..25f,
+                steps = 24,
+                valueString = "$webtoonSidePadding%"
             )
         }
 
@@ -368,14 +383,56 @@ private fun GeneralSettingsTab(isTextReader: Boolean, screenModel: ReaderScreenM
 
 @Composable
 private fun FilterSettingsTab(screenModel: ReaderScreenModel) {
-    val filterMode by screenModel.colorFilterMode.collectAsState()
+    val invertColors by screenModel.invertColors.collectAsState()
+    val grayscale by screenModel.grayscale.collectAsState()
     
     Column {
-        HeadingItem("Bộ lọc tùy chỉnh")
-        CheckboxItem(label = "Không có", checked = filterMode == 0, onClick = { screenModel.setColorFilterMode(0) })
-        CheckboxItem(label = "Xám (Grayscale)", checked = filterMode == 1, onClick = { screenModel.setColorFilterMode(1) })
-        CheckboxItem(label = "Đảo ngược màu", checked = filterMode == 2, onClick = { screenModel.setColorFilterMode(2) })
-        CheckboxItem(label = "Sepia", checked = filterMode == 3, onClick = { screenModel.setColorFilterMode(3) })
+        HeadingItem("Bộ lọc màu ảnh")
+        CheckboxItem(label = "Đảo ngược màu (Invert)", checked = invertColors, onClick = { screenModel.setInvertColors(!invertColors) })
+        CheckboxItem(label = "Xám (Grayscale)", checked = grayscale, onClick = { screenModel.setGrayscale(!grayscale) })
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HeadingItem("Chế độ ban đêm (Custom Color Filter)")
+        
+        val customColorFilter by screenModel.customColorFilter.collectAsState()
+        val customColorFilterColor by screenModel.customColorFilterColor.collectAsState()
+        val customColorFilterAlpha by screenModel.customColorFilterAlpha.collectAsState()
+        val customColorFilterBlendMode by screenModel.customColorFilterBlendMode.collectAsState()
+        
+        CheckboxItem(
+            label = "Bật bộ lọc màn hình", 
+            checked = customColorFilter, 
+            onClick = { screenModel.setCustomColorFilter(!customColorFilter) }
+        )
+
+        if (customColorFilter) {
+            SliderItem(
+                label = "Độ mờ (Opacity)", 
+                value = customColorFilterAlpha, 
+                valueRange = 0.05f..0.9f, 
+                valueString = "${(customColorFilterAlpha * 100).toInt()}%", 
+                onValueChange = { screenModel.setCustomColorFilterAlpha(it) }
+            )
+
+            HeadingItem("Màu sắc")
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                listOf(0xFFB300, 0xFF0000, 0x00FF00, 0x0000FF, 0x8800FF).forEach { colorInt ->
+                    Surface(
+                        modifier = Modifier.size(40.dp).clickable { screenModel.setCustomColorFilterColor(colorInt) },
+                        shape = CircleShape,
+                        color = Color(colorInt),
+                        border = if (customColorFilterColor == colorInt) BorderStroke(3.dp, PrimaryOrange) else null
+                    ) {}
+                }
+            }
+
+            HeadingItem("Chế độ hòa trộn (Blend Mode)")
+            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReadingModeButton("Multiply", customColorFilterBlendMode == 0) { screenModel.setCustomColorFilterBlendMode(0) }
+                ReadingModeButton("Screen", customColorFilterBlendMode == 1) { screenModel.setCustomColorFilterBlendMode(1) }
+                ReadingModeButton("Overlay", customColorFilterBlendMode == 2) { screenModel.setCustomColorFilterBlendMode(2) }
+            }
+        }
     }
 }
 

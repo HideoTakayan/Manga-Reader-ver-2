@@ -25,10 +25,7 @@ class BackupManager(
         encodeDefaults = true
     }
 
-    /**
-     * Create a backup and save to a file.
-     */
-    suspend fun createBackup(uri: android.net.Uri): Boolean = withContext(Dispatchers.IO) {
+    suspend fun createBackupString(): String? = withContext(Dispatchers.IO) {
         try {
             val allManga = mangaRepository.getLibrary().first()
             val categories = mangaRepository.getCategories().first()
@@ -38,10 +35,6 @@ class BackupManager(
                 val chapters = mangaRepository.getChaptersByMangaId(manga.id)
                 val mangaCategoryIds = mangaRepository.getMangaCategoryIds(manga.id)
                 val mangaCategories = categories.filter { it.id in mangaCategoryIds }.map { it.name }
-                
-                // Get history for this manga's chapters
-                // For simplicity in MRv2, we'll just backup the chapters' read status
-                // If we had a specific history table, we'd join it.
                 
                 BackupManga(
                     url = manga.url,
@@ -76,29 +69,27 @@ class BackupManager(
                 backupCategories = categories.map { BackupCategory(it.name, it.sortIndex) }
             )
 
-            val backupString = json.encodeToString(backup)
-            
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                GZIPOutputStream(outputStream).use { gzip ->
-                    gzip.write(backupString.toByteArray())
-                }
-            }
-            true
+            json.encodeToString(backup)
         } catch (e: Exception) {
-            logcat { "Backup creation failed: ${e.message}" }
+            logcat { "Backup string creation failed: ${e.message}" }
+            null
+        }
+    }
+
+    suspend fun restoreBackupFromBytes(gzipBytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val backupString = java.io.ByteArrayInputStream(gzipBytes).use { inputStream ->
+                GZIPInputStream(inputStream).bufferedReader().readText()
+            }
+            restoreBackupFromString(backupString)
+        } catch (e: Exception) {
+            logcat { "Restore from bytes failed: ${e.message}" }
             false
         }
     }
 
-    /**
-     * Restore from a backup file.
-     */
-    suspend fun restoreBackup(uri: android.net.Uri): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun restoreBackupFromString(backupString: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val backupString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                GZIPInputStream(inputStream).bufferedReader().readText()
-            } ?: return@withContext false
-
             val backup = json.decodeFromString<Backup>(backupString)
             
             // 1. Restore Categories
@@ -171,6 +162,89 @@ class BackupManager(
                 }
             }
             true
+        } catch (e: Exception) {
+            logcat { "Backup restoration failed: ${e.message}" }
+            false
+        }
+    }
+
+    /**
+     * Create a backup and save to a file.
+     */
+    suspend fun createBackup(uri: android.net.Uri): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val backupString = createBackupString() ?: return@withContext false
+            
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                GZIPOutputStream(outputStream).use { gzip ->
+                    gzip.write(backupString.toByteArray())
+                }
+            }
+            true
+        } catch (e: Exception) {
+            logcat { "Backup creation failed: ${e.message}" }
+            false
+        }
+    }
+
+    /**
+     * Validate & preview backup file — gọi trước khi restoreBackup để user confirm.
+     */
+    suspend fun previewBackup(uri: android.net.Uri): com.example.manga_readerver2.core.backup.model.BackupPreview = withContext(Dispatchers.IO) {
+        try {
+            val backupString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                // Try GZIP first, fallback to plain text
+                try {
+                    GZIPInputStream(inputStream).bufferedReader().readText()
+                } catch (e: Exception) {
+                    null
+                }
+            } ?: return@withContext com.example.manga_readerver2.core.backup.model.BackupPreview(
+                mangaCount = 0, chapterCount = 0, categoryCount = 0,
+                isValid = false, errorMessage = "Không thể đọc file backup"
+            )
+
+            val backup = try {
+                json.decodeFromString<com.example.manga_readerver2.core.backup.model.Backup>(backupString)
+            } catch (e: Exception) {
+                return@withContext com.example.manga_readerver2.core.backup.model.BackupPreview(
+                    mangaCount = 0, chapterCount = 0, categoryCount = 0,
+                    isValid = false, errorMessage = "File backup bị lỗi hoặc không đúng định dạng"
+                )
+            }
+
+            // Validate: must have at least some manga
+            if (backup.backupManga.isEmpty()) {
+                return@withContext com.example.manga_readerver2.core.backup.model.BackupPreview(
+                    mangaCount = 0, chapterCount = 0, categoryCount = backup.backupCategories.size,
+                    isValid = false, errorMessage = "File backup không chứa truyện nào"
+                )
+            }
+
+            com.example.manga_readerver2.core.backup.model.BackupPreview(
+                mangaCount = backup.backupManga.size,
+                chapterCount = backup.backupManga.sumOf { it.chapters.size },
+                categoryCount = backup.backupCategories.size,
+                isValid = true
+            )
+        } catch (e: Exception) {
+            com.example.manga_readerver2.core.backup.model.BackupPreview(
+                mangaCount = 0, chapterCount = 0, categoryCount = 0,
+                isValid = false, errorMessage = "Lỗi không xác định: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Restore from a backup file.
+     */
+    suspend fun restoreBackup(uri: android.net.Uri): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val backupString = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                GZIPInputStream(inputStream).bufferedReader().readText()
+            } ?: return@withContext false
+
+            restoreBackupFromString(backupString)
         } catch (e: Exception) {
             logcat { "Backup restoration failed: ${e.message}" }
             false

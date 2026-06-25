@@ -1,11 +1,11 @@
-package com.example.manga_readerver2.features.settings
+﻿package com.example.manga_readerver2.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,10 +36,10 @@ class ReaderSettingsScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Cài đặt trình đọc", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("CĂ i Ä‘áº·t trĂ¬nh Ä‘á»c", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -56,44 +56,57 @@ class ReaderSettingsScreen : Screen {
                 
                 PreferenceSwitchItem(
                     title = "Double tap zoom",
-                    subtitle = "Phóng to khi nhấn đúp",
+                    subtitle = "PhĂ³ng to khi nháº¥n Ä‘Ăºp",
                     checked = preferences.doubleTapZoom.get(),
                     onCheckedChange = { preferences.doubleTapZoom.set(it) }
                 )
 
                 PreferenceSwitchItem(
-                    title = "Hiển thị số trang",
+                    title = "Hiá»ƒn thá»‹ sá»‘ trang",
                     checked = preferences.showPageNumber.get(),
                     onCheckedChange = { preferences.showPageNumber.set(it) }
                 )
 
                 PreferenceSwitchItem(
-                    title = "Điều hướng phím âm lượng",
+                    title = "Äiá»u hÆ°á»›ng phĂ­m Ă¢m lÆ°á»£ng",
                     checked = preferences.volumeKeysNavigation.get(),
                     onCheckedChange = { preferences.volumeKeysNavigation.set(it) }
                 )
 
-                PreferenceHeader("Truyện chữ (Novel)")
+                PreferenceHeader("Truyá»‡n chá»¯ (Novel)")
                 
                 PreferenceSliderItem(
-                    title = "Kích thước chữ",
+                    title = "KĂ­ch thÆ°á»›c chá»¯",
                     value = preferences.fontSize.get(),
                     range = 12f..32f,
                     onValueChange = { preferences.fontSize.set(it) }
                 )
 
                 PreferenceSliderItem(
-                    title = "Khoảng cách dòng",
+                    title = "Khoáº£ng cĂ¡ch dĂ²ng",
                     value = preferences.lineSpacing.get(),
                     range = 1.0f..2.5f,
                     onValueChange = { preferences.lineSpacing.set(it) }
                 )
 
-                PreferenceHeader("Chế độ đọc mặc định")
+                PreferenceHeader("Cháº¿ Ä‘á»™ Ä‘á»c máº·c Ä‘á»‹nh")
                 
                 ReadingModeSelector(
                     selectedMode = preferences.readingMode.get(),
                     onModeSelected = { preferences.readingMode.set(it) }
+                )
+
+                PreferenceHeader("Báº£o máº­t & Quyá»n riĂªng tÆ°")
+                
+                var incognitoMode by remember { mutableStateOf(preferences.incognitoMode.get()) }
+                PreferenceSwitchItem(
+                    title = "Cháº¿ Ä‘á»™ áº©n danh",
+                    subtitle = "KhĂ´ng lÆ°u lá»‹ch sá»­ vĂ  trang Ä‘ang Ä‘á»c",
+                    checked = incognitoMode,
+                    onCheckedChange = { 
+                        incognitoMode = it
+                        preferences.incognitoMode.set(it) 
+                    }
                 )
             }
         }
@@ -173,7 +186,7 @@ fun ReadingModeSelector(
     selectedMode: Int,
     onModeSelected: (Int) -> Unit
 ) {
-    val modes = listOf("Dọc", "Ngang", "Webtoon")
+    val modes = listOf("Dá»c", "Ngang", "Webtoon")
     Column(modifier = Modifier.padding(horizontal = 24.dp)) {
         modes.forEachIndexed { index, name ->
             Row(
@@ -194,3 +207,5 @@ fun ReadingModeSelector(
         }
     }
 }
+
+

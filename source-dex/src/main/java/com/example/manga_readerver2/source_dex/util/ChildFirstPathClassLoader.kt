@@ -11,8 +11,6 @@ import java.util.Enumeration
  * - the system class loader
  * - the child class loader
  * - the parent class loader.
- * 
- * Cloned from Mihon for 1:1 compatibility.
  */
 class ChildFirstPathClassLoader(
     dexPath: String,

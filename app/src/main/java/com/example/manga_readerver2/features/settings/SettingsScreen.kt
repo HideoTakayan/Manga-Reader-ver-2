@@ -1,4 +1,4 @@
-package com.example.manga_readerver2.features.settings
+﻿package com.example.manga_readerver2.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -83,7 +84,7 @@ class SettingsScreen : Screen {
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        "Phiên bản 2.5.0-VipPro",
+                        "PhiĂªn báº£n 2.5.0-VipPro",
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
@@ -92,16 +93,16 @@ class SettingsScreen : Screen {
                 // Global Switches
                 MoreSwitch(
                     icon = Icons.Outlined.CloudOff,
-                    title = "Chỉ tải xuống",
-                    subtitle = "Chỉ hiển thị truyện đã tải xuống trong thư viện",
+                    title = "Chá»‰ táº£i xuá»‘ng",
+                    subtitle = "Chá»‰ hiá»ƒn thá»‹ truyá»‡n Ä‘Ă£ táº£i xuá»‘ng trong thÆ° viá»‡n",
                     checked = downloadedOnly,
                     onCheckedChange = { screenModel.setDownloadedOnly(it) }
                 )
 
                 MoreSwitch(
                     icon = Icons.Outlined.VisibilityOff,
-                    title = "Chế độ ẩn danh",
-                    subtitle = "Ngưng lưu lịch sử đọc truyện",
+                    title = "Cháº¿ Ä‘á»™ áº©n danh",
+                    subtitle = "NgÆ°ng lÆ°u lá»‹ch sá»­ Ä‘á»c truyá»‡n",
                     checked = incognitoMode,
                     onCheckedChange = { screenModel.setIncognitoMode(it) }
                 )
@@ -111,20 +112,20 @@ class SettingsScreen : Screen {
                 // General
                 MoreItem(
                     icon = Icons.Outlined.GetApp,
-                    title = "Hàng chờ tải xuống",
-                    subtitle = if (queueCount > 0) "$queueCount chương đang chờ" else null,
+                    title = "HĂ ng chá» táº£i xuá»‘ng",
+                    subtitle = if (queueCount > 0) "$queueCount chÆ°Æ¡ng Ä‘ang chá»" else null,
                     onClick = { rootNavigator.push(DownloadQueueScreen()) }
                 )
                 
                 MoreItem(
                     icon = Icons.Outlined.Label,
-                    title = "Danh mục",
+                    title = "Danh má»¥c",
                     onClick = { rootNavigator.push(com.example.manga_readerver2.features.library.CategoryManagerScreen()) }
                 )
 
                 MoreItem(
                     icon = Icons.Outlined.QueryStats,
-                    title = "Thống kê",
+                    title = "Thá»‘ng kĂª",
                     onClick = { rootNavigator.push(com.example.manga_readerver2.features.statistics.StatisticsScreen()) }
                 )
 
@@ -133,8 +134,8 @@ class SettingsScreen : Screen {
                 // Data management
                 MoreItem(
                     icon = Icons.Outlined.DeleteSweep,
-                    title = "Xóa bộ nhớ đệm",
-                    subtitle = "Dung lượng hiện tại: $cacheSize",
+                    title = "XĂ³a bá»™ nhá»› Ä‘á»‡m",
+                    subtitle = "Dung lÆ°á»£ng hiá»‡n táº¡i: $cacheSize",
                     onClick = { screenModel.clearCache() }
                 )
                 
@@ -143,25 +144,25 @@ class SettingsScreen : Screen {
                 // Settings & Others
                 MoreItem(
                     icon = Icons.Outlined.Settings,
-                    title = "Cài đặt",
+                    title = "CĂ i Ä‘áº·t",
                     onClick = { rootNavigator.push(SettingsDetailScreen()) }
                 )
 
                 MoreItem(
                     icon = Icons.Outlined.VolunteerActivism,
-                    title = "Ủng hộ chúng tôi",
+                    title = "á»¦ng há»™ chĂºng tĂ´i",
                     onClick = { uriHandler.openUri("https://github.com/Darkrai9x") }
                 )
                 
                 MoreItem(
                     icon = Icons.Outlined.Info,
-                    title = "Thông tin",
-                    onClick = { /* Hiển thị dialog thông tin hoặc trang web */ }
+                    title = "ThĂ´ng tin",
+                    onClick = { /* Hiá»ƒn thá»‹ dialog thĂ´ng tin hoáº·c trang web */ }
                 )
 
                 MoreItem(
                     icon = Icons.Outlined.HelpOutline,
-                    title = "Trợ giúp",
+                    title = "Trá»£ giĂºp",
                     onClick = { uriHandler.openUri("https://mihon.app/docs") }
                 )
 
@@ -228,3 +229,4 @@ fun MoreItem(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Strin
         }
     }
 }
+

@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChevronRight
@@ -69,12 +69,12 @@ Scaffold(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                         TextField(
                             value = query,
                             onValueChange = { query = it },
-                            placeholder = { Text("Tìm kiếm toàn cầu...", color = Color.Gray) },
+                            placeholder = { Text("TĂ¬m kiáº¿m toĂ n cáº§u...", color = Color.Gray) },
                             modifier = Modifier.weight(1f),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -114,7 +114,7 @@ Scaffold(
                 if (resultsList.isEmpty() && !state.isSearching) {
                     item {
                         Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Nhập từ khóa để tìm kiếm trên tất cả nguồn", color = Color.Gray)
+                            Text("Nháº­p tá»« khĂ³a Ä‘á»ƒ tĂ¬m kiáº¿m trĂªn táº¥t cáº£ nguá»“n", color = Color.Gray)
                         }
                     }
                 }
@@ -128,6 +128,9 @@ Scaffold(
                                 val id = screenModel.getMangaId(manga)
                                 navigator.push(MangaDetailScreen(id))
                             }
+                        },
+                        onViewAllClick = {
+                            navigator.push(CatalogueScreen(source.id, source.name, initialQuery = query))
                         }
                     )
                 }
@@ -147,13 +150,16 @@ Scaffold(
     fun SourceResultSection(
         source: CatalogueSource,
         result: GlobalSearchResult,
-        onMangaClick: (Manga) -> Unit
+        onMangaClick: (Manga) -> Unit,
+        onViewAllClick: () -> Unit
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { /* View all results from this source */ }
+                    .clickable { 
+                        onViewAllClick()
+                    }
                     .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -184,7 +190,7 @@ Scaffold(
                 }
                 Icon(
                     Icons.Default.ChevronRight, 
-                    contentDescription = "Xem tất cả", 
+                    contentDescription = "Xem táº¥t cáº£", 
                     tint = Color.Gray,
                     modifier = Modifier.size(20.dp)
                 )
@@ -199,7 +205,7 @@ Scaffold(
                     }
                 }
                 is GlobalSearchResult.Error -> {
-                    Text("Lỗi: ${result.message}", color = Color.Red, fontSize = 12.sp)
+                    Text("Lá»—i: ${result.message}", color = Color.Red, fontSize = 12.sp)
                 }
                 is GlobalSearchResult.Success -> {
                     LazyRow(
@@ -243,3 +249,5 @@ Scaffold(
         }
     }
 }
+
+

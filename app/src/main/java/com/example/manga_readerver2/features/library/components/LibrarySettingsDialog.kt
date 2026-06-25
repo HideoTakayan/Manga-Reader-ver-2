@@ -121,14 +121,32 @@ private fun FilterPage(preferences: LibraryPreferences = Injekt.get()) {
 }
 
 @Composable
-private fun SortPage() {
+private fun SortPage(preferences: LibraryPreferences = Injekt.get()) {
+    val sortMode by preferences.sortMode.asFlow().collectAsState(preferences.sortMode.get())
     Column {
-        var sortDescending by remember { mutableStateOf<Boolean?>(true) }
         HeadingItem("Sắp xếp theo")
-        SortItem(label = "Tên", sortDescending = if (false) sortDescending else null, onClick = {})
-        SortItem(label = "Ngày thêm", sortDescending = if (true) sortDescending else null, onClick = { sortDescending = sortDescending?.not() ?: true })
-        SortItem(label = "Lần đọc cuối", sortDescending = null, onClick = {})
-        SortItem(label = "Số chương chưa đọc", sortDescending = null, onClick = {})
+        // 0=DATE_ADDED, 1=TITLE, 2=LAST_UPDATE
+        listOf(
+            0 to "Ngày thêm",
+            1 to "Tên truyện",
+            2 to "Lần cập nhật cuối"
+        ).forEach { (mode, label) ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { preferences.sortMode.set(mode) }
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = sortMode == mode,
+                    onClick = null,
+                    colors = RadioButtonDefaults.colors(selectedColor = PrimaryOrange, unselectedColor = TextSecondary)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(label, color = TextPrimary, fontSize = 16.sp)
+            }
+        }
     }
 }
 

@@ -28,13 +28,13 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 sealed class ReaderPage {
     data class Local(val file: File) : ReaderPage()
     data class Archive(val file: File, val entryName: String) : ReaderPage()
-    data class Online(var url: String, val index: Int, var isLoading: Boolean = false, var localFile: String? = null) : ReaderPage()
+    data class Online(var url: String, val index: Int, var isLoading: Boolean = false, var localFile: String? = null, var hasError: Boolean = false) : ReaderPage()
     data class Text(val content: String) : ReaderPage()
     data class Pdf(val file: File, val pageIndex: Int) : ReaderPage()
 }
 
 enum class ReadingMode {
-    HORIZONTAL, VERTICAL
+    RIGHT_TO_LEFT, LEFT_TO_RIGHT, VERTICAL, WEBTOON
 }
 
 class ReaderScreenModel(
@@ -43,8 +43,12 @@ class ReaderScreenModel(
     private val fileManager: FileManager = Injekt.get(),
     private val extensionManager: ExtensionManager = Injekt.get(),
     private val readerPreferences: ReaderPreferences = Injekt.get(),
+    private val displayPreferences: com.example.manga_readerver2.core.preference.DisplayPreferences = Injekt.get(),
+    private val downloadPreferences: com.example.manga_readerver2.core.preference.DownloadPreferences = Injekt.get(),
+    private val anilistManager: com.example.manga_readerver2.core.track.AniListManager = Injekt.get(),
     private val ttsManager: com.example.manga_readerver2.core.tts.TtsManager = Injekt.get(),
-    private val downloadManager: com.example.manga_readerver2.core.download.DownloadManager = Injekt.get()
+    private val downloadManager: com.example.manga_readerver2.core.download.DownloadManager = Injekt.get(),
+    private val sourceManager: com.example.manga_readerver2.core.source.SourceManager = Injekt.get()
 ) : ScreenModel {
     private val _pageCount = MutableStateFlow(0)
     val pageCount: StateFlow<Int> = _pageCount.asStateFlow()
@@ -104,14 +108,44 @@ class ReaderScreenModel(
     private val _readerTheme = MutableStateFlow(readerPreferences.theme.get()) // 0: Dark, 1: White, 2: Sepia
     val readerTheme = _readerTheme.asStateFlow()
 
-    private val _cropBorders = MutableStateFlow(false)
+    private val _cropBorders = MutableStateFlow(readerPreferences.cropBorders.get())
     val cropBorders = _cropBorders.asStateFlow()
 
     private val _brightness = MutableStateFlow(1.0f) // 0.0 to 1.0 (1.0 is full bright)
     val brightness = _brightness.asStateFlow()
 
+    private val _customColorFilter = MutableStateFlow(readerPreferences.customColorFilter.get())
+    val customColorFilter = _customColorFilter.asStateFlow()
+
+    private val _customColorFilterColor = MutableStateFlow(readerPreferences.customColorFilterColor.get())
+    val customColorFilterColor = _customColorFilterColor.asStateFlow()
+
+    private val _customColorFilterAlpha = MutableStateFlow(readerPreferences.customColorFilterAlpha.get())
+    val customColorFilterAlpha = _customColorFilterAlpha.asStateFlow()
+
+    private val _customColorFilterBlendMode = MutableStateFlow(readerPreferences.customColorFilterBlendMode.get())
+    val customColorFilterBlendMode = _customColorFilterBlendMode.asStateFlow()
+
+    private val _invertColors = MutableStateFlow(readerPreferences.invertColors.get())
+    val invertColors = _invertColors.asStateFlow()
+
+    private val _grayscale = MutableStateFlow(readerPreferences.grayscale.get())
+    val grayscale = _grayscale.asStateFlow()
+
+    private val _volumeKeyNavigation = MutableStateFlow(readerPreferences.volumeKeyNavigation.get())
+    val volumeKeyNavigation = _volumeKeyNavigation.asStateFlow()
+
+    private val _dualPage = MutableStateFlow(readerPreferences.dualPage.get())
+    val dualPage = _dualPage.asStateFlow()
+
+    private val _webtoonSidePadding = MutableStateFlow(readerPreferences.webtoonSidePadding.get())
+    val webtoonSidePadding = _webtoonSidePadding.asStateFlow()
+
     private val _fontSize = MutableStateFlow(readerPreferences.fontSize.get())
     val fontSize = _fontSize.asStateFlow()
+
+    private val _autoScrollSpeed = MutableStateFlow(readerPreferences.autoScrollSpeed.get())
+    val autoScrollSpeed = _autoScrollSpeed.asStateFlow()
 
     private val _lineSpacing = MutableStateFlow(readerPreferences.lineSpacing.get())
     val lineSpacing = _lineSpacing.asStateFlow()
@@ -144,7 +178,12 @@ class ReaderScreenModel(
         // Collect reactive preferences to update UI state
         screenModelScope.launch {
             readerPreferences.readingMode.asFlow().collect { modeInt ->
-                _readingMode.value = ReadingMode.entries.getOrElse(modeInt) { ReadingMode.VERTICAL }
+                val mode = when (modeInt) {
+                    0 -> ReadingMode.RIGHT_TO_LEFT // Old HORIZONTAL was 0 -> mapped to RTL
+                    1 -> ReadingMode.WEBTOON // Old VERTICAL was 1 -> mapped to WEBTOON
+                    else -> ReadingMode.entries.getOrElse(modeInt) { ReadingMode.WEBTOON }
+                }
+                _readingMode.value = mode
             }
         }
         screenModelScope.launch {
@@ -167,6 +206,9 @@ class ReaderScreenModel(
         }
         screenModelScope.launch {
             readerPreferences.autoDownloadAmount.asFlow().collect { _autoDownloadAmount.value = it }
+        }
+        screenModelScope.launch {
+            readerPreferences.cropBorders.asFlow().collect { _cropBorders.value = it }
         }
         
         // Fix BUG-07: Tự động chuyển chương khi TTS đọc hết
@@ -250,190 +292,136 @@ class ReaderScreenModel(
                 _chapters.value = allChapters
                 currentMangaChapters = allChapters
                 currentChapter = allChapters.find { it.id == cId }
-                
+                _isChapterBookmarked.value = currentChapter?.bookmark ?: false
+
                 val manga = manga ?: throw Exception("Không tìm thấy truyện")
                 val currentChapter = currentChapter ?: throw Exception("Không tìm thấy chương")
                 
                 _chapterName.value = currentChapter.name
-                
-                val sourceName = extensionManager.getSource(manga.source)?.name ?: "Unknown"
-
-                // 0. Kiểm tra xem chương này có đang trong quá trình tải xuống không
+                val sourceName = sourceManager.get(manga.source)?.name ?: "Unknown"
                 val isDownloading = downloadManager.queueState.value.any { 
                     it.manga.id == mId && it.chapter.id == cId && it.status == com.example.manga_readerver2.core.download.Download.State.DOWNLOADING 
                 }
                 
-                // Nếu đang tải, chúng ta đọc Online để tránh xung đột file đang bị ghi
                 if (!isDownloading) {
-                    // Thiết lập trang bắt đầu (Resume)
                     val lastPage = currentChapter.lastPageRead.toInt()
                     
-                    // 0.1 Kiểm tra file cục bộ (Imported)
-                if (currentChapter.url.startsWith("local/")) {
-                    val localFileName = currentChapter.url.substringAfter("local/").substringBefore("#")
-                    val sourceNameForPath = if (manga.source == 0L) "Local" else sourceName
-                    val localFile = File(fileManager.getMangaPath(sourceNameForPath, manga.title, manga.id.toString()), localFileName)
-                    
-                    if (localFile.exists()) {
-                        val extension = localFile.extension.lowercase()
-                        if (extension == "cbz") {
-                            currentZipFile = withContext(Dispatchers.IO) { java.util.zip.ZipFile(localFile) }
-                            val entries = com.example.manga_readerver2.core.utils.ArchiveReader.getOrderedImageEntries(localFile)
-                            val pages = entries.map { ReaderPage.Archive(localFile, it) }
-                            _allPages.value = pages
-                            _pageCount.value = pages.size
-                            if (lastPage in 0 until pages.size) {
-                                _currentPage.value = lastPage
-                            }
-                            _isLoading.value = false
-                            saveHistory()
-                            return@launch
-                        } else if (extension == "pdf") {
-                            val pfd = android.os.ParcelFileDescriptor.open(localFile, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
-                            val renderer = android.graphics.pdf.PdfRenderer(pfd)
-                            currentPdfFileDescriptor = pfd
-                            currentPdfRenderer = renderer
-                            
-                            val pages = (0 until renderer.pageCount).map { ReaderPage.Pdf(localFile, it) }
-                            _allPages.value = pages
-                            _pageCount.value = pages.size
-                            if (lastPage in 0 until pages.size) {
-                                _currentPage.value = lastPage
-                            }
-                            _isLoading.value = false
-                            saveHistory()
-                            return@launch
-                        } else if (extension == "epub") {
-                            _isTextReader.value = true
-                            val href = currentChapter.url.substringAfter("#", "")
-                            val content = withContext(Dispatchers.IO) { 
-                                if (href.isNotEmpty()) {
-                                    com.example.manga_readerver2.core.utils.EpubReader.getChapterText(localFile, href)
-                                } else {
-                                    com.example.manga_readerver2.core.utils.EpubReader.getFullText(localFile) 
-                                }
-                            }
-                            _allPages.value = listOf(ReaderPage.Text(content))
-                            _pageCount.value = 1
-                            _isLoading.value = false
-                            saveHistory()
-                            return@launch
-                        }
-                    }
-                }
-
-                // 1. Kiểm tra file nén CBZ (Truyện tranh - Mihon style)
-                // Fix O1: Fallback tìm file offline khi extension đã bị gỡ cài đặt
-                var cbzFile = fileManager.getChapterCbzPath(sourceName, manga.title, manga.id.toString(), currentChapter.name)
-                if (!cbzFile.exists()) {
-                    // Cố gắng tìm bằng cách duyệt qua tất cả thư mục download nếu sourceName bị Unknown
-                    val allDownloadsDir = fileManager.getDownloadPath()
-                    val potentialDirs = allDownloadsDir.listFiles { dir -> dir.isDirectory }?.flatMap { it.listFiles()?.toList() ?: emptyList() }
-                    val targetDir = potentialDirs?.find { it.name.contains(manga.id.toString().takeLast(6)) }
-                    if (targetDir != null) {
-                        cbzFile = File(targetDir, "${currentChapter.name}.cbz".replace(Regex("[\\\\/:*?\"<>|]"), "_").trim())
-                    }
-                }
-
-                if (cbzFile.exists()) {
-                    currentZipFile = withContext(Dispatchers.IO) { java.util.zip.ZipFile(cbzFile) }
-                    val entries = ArchiveReader.getOrderedImageEntries(cbzFile)
-                    val pages = entries.map { ReaderPage.Archive(cbzFile, it) }
-                    _allPages.value = pages
-                    _pageCount.value = pages.size
-                    
-                    if (lastPage in 0 until pages.size) {
-                        _currentPage.value = lastPage
-                    }
-                    
-                    _isLoading.value = false
-                    saveHistory()
-                    return@launch
-                }
-
-                // Kiểm tra file EPUB (Truyện chữ Offline đã tải từ Extension)
-                var novelFile = fileManager.getChapterNovelPath(sourceName, manga.title, manga.id.toString(), currentChapter.name)
-                if (!novelFile.exists()) {
-                     val allDownloadsDir = fileManager.getDownloadPath()
-                     val potentialDirs = allDownloadsDir.listFiles { dir -> dir.isDirectory }?.flatMap { it.listFiles()?.toList() ?: emptyList() }
-                     val targetDir = potentialDirs?.find { it.name.contains(manga.id.toString().takeLast(6)) }
-                     if (targetDir != null) {
-                         novelFile = File(targetDir, "${currentChapter.name}.epub".replace(Regex("[\\\\/:*?\"<>|]"), "_").trim())
-                     }
-                }
-
-                if (novelFile.exists()) {
-                    _isTextReader.value = true
-                    // Fix R3: Hiển thị đầy đủ HTML từ epub, dùng getFullText (vì epub này có thể từ external), 
-                    // ToC có thể cần thiết cho màn hình lớn hơn nhưng tạm thời getFullText là fallback hiệu quả nhất
-                    val content = withContext(Dispatchers.IO) { 
-                        com.example.manga_readerver2.core.utils.EpubReader.getFullText(novelFile) 
-                    }
-                    _allPages.value = listOf(ReaderPage.Text(content))
-                    _pageCount.value = 1
-                    _isLoading.value = false
-                    saveHistory()
-                    return@launch
-                }
-
-                // 2. Nếu không tìm thấy file Offline hoàn chỉnh hoặc đang tải -> Đọc ONLINE từ nguồn
-                val source = extensionManager.getSource(manga.source) as? CatalogueSource
-                if (source != null) {
-                    // SChapter mapping
-                    val sChapter = eu.kanade.tachiyomi.source.model.SChapter.create().apply {
-                        url = currentChapter.url
-                        name = currentChapter.name
-                    }
-                        val networkPages = withContext(Dispatchers.IO) {
-                            source.getPageList(sChapter)
-                        }
+                    // Local/Imported
+                    if (currentChapter.url.startsWith("local/")) {
+                        val localFileName = currentChapter.url.substringAfter("local/").substringBefore("#")
+                        val sourceNameForPath = if (manga.source == 0L) "Local" else sourceName
+                        val localFile = File(fileManager.getMangaPath(sourceNameForPath, manga.title, manga.id.toString()), localFileName)
                         
-                        // Detect if it's text-based (JS VBook)
-                        val extensions = extensionManager.installedExtensions.value
-                        val sourceExt = extensions.find { ext -> ext.sources.any { it.id == manga.source } }
-                        val isVBook = sourceExt?.isVBook == true
-
-                        if (isVBook && networkPages.isNotEmpty()) {
-                            val firstPage = networkPages.first()
-                            val content = firstPage.imageUrl ?: ""
-                            // Fix: detect text/HTML content chính xác hơn, không chỉ dựa vào length
-                            val isHtmlContent = content.trimStart().let {
-                                it.startsWith("<") || it.contains("<p") || it.contains("<div") || it.contains("<br")
-                            }
-                            // Fix: content.length > 50 có thể khớp URL CDN dài → raise lên 200
-                            // Thêm check scheme rõ ràng: http/https/data:image là URL, không phải text
-                            val looksLikeUrl = content.startsWith("http://") || content.startsWith("https://") || content.startsWith("data:")
-                            val isTextContent = !looksLikeUrl && (isHtmlContent || content.length > 200)
-                            if (isTextContent) {
-                                _isTextReader.value = true
-                                _allPages.value = listOf(ReaderPage.Text(content))
-                                _pageCount.value = 1
-                            } else {
-                                val pages = networkPages.mapIndexed { index, page -> 
-                                    ReaderPage.Online(page.imageUrl ?: "", index) 
-                                }
+                        if (localFile.exists()) {
+                            val extension = localFile.extension.lowercase()
+                            if (extension == "cbz") {
+                                currentZipFile = withContext(Dispatchers.IO) { java.util.zip.ZipFile(localFile) }
+                                val entries = com.example.manga_readerver2.core.utils.ArchiveReader.getOrderedImageEntries(localFile)
+                                val pages = entries.map { ReaderPage.Archive(localFile, it) }
                                 _allPages.value = pages
                                 _pageCount.value = pages.size
-                                // Fix R1: Cần phải gọi loadPage cho truyện tranh VBook để tải ảnh thực tế
-                                loadPage(lastPage.coerceIn(0, pages.size - 1))
+                                _currentPage.value = lastPage.coerceIn(0, pages.size - 1)
+                                _isLoading.value = false
+                                saveHistory()
+                                return@launch
+                            } else if (extension == "pdf") {
+                                val pfd = android.os.ParcelFileDescriptor.open(localFile, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+                                val renderer = android.graphics.pdf.PdfRenderer(pfd)
+                                currentPdfFileDescriptor = pfd
+                                currentPdfRenderer = renderer
+                                val pages = (0 until renderer.pageCount).map { ReaderPage.Pdf(localFile, it) }
+                                _allPages.value = pages
+                                _pageCount.value = pages.size
+                                _currentPage.value = lastPage.coerceIn(0, pages.size - 1)
+                                _isLoading.value = false
+                                saveHistory()
+                                return@launch
+                            } else if (extension == "epub") {
+                                _isTextReader.value = true
+                                val href = currentChapter.url.substringAfter("#", "")
+                                val content = withContext(Dispatchers.IO) { 
+                                    if (href.isNotEmpty()) {
+                                        com.example.manga_readerver2.core.utils.EpubReader.getChapterText(localFile, href)
+                                    } else {
+                                        com.example.manga_readerver2.core.utils.EpubReader.getFullText(localFile) 
+                                    }
+                                }
+                                _allPages.value = listOf(ReaderPage.Text(content))
+                                _pageCount.value = 1
+                                _currentPage.value = 0
+                                _isLoading.value = false
+                                saveHistory()
+                                return@launch
                             }
+                        }
+                    }
+
+                    // Downloaded CBZ
+                    var cbzFile = fileManager.getChapterCbzPath(sourceName, manga.title, manga.id.toString(), currentChapter.name)
+                    if (!cbzFile.exists()) {
+                        val allDownloadsDir = fileManager.getDownloadPath()
+                        val potentialDirs = allDownloadsDir.listFiles { dir -> dir.isDirectory }?.flatMap { it.listFiles()?.toList() ?: emptyList() }
+                        val targetDir = potentialDirs?.find { it.name.contains(manga.id.toString().takeLast(6)) }
+                        if (targetDir != null) {
+                            cbzFile = File(targetDir, "${currentChapter.name}.cbz".replace(Regex("[\\\\/:*?\"<>|]"), "_").trim())
+                        }
+                    }
+
+                    if (cbzFile.exists()) {
+                        currentZipFile = withContext(Dispatchers.IO) { java.util.zip.ZipFile(cbzFile) }
+                        val entries = ArchiveReader.getOrderedImageEntries(cbzFile)
+                        val pages = entries.map { ReaderPage.Archive(cbzFile, it) }
+                        _allPages.value = pages
+                        _pageCount.value = pages.size
+                        _currentPage.value = lastPage.coerceIn(0, pages.size - 1)
+                        _isLoading.value = false
+                        saveHistory()
+                        return@launch
+                    }
+
+                    // Downloaded EPUB
+                    var novelFile = fileManager.getChapterNovelPath(sourceName, manga.title, manga.id.toString(), currentChapter.name)
+                    if (novelFile.exists()) {
+                        _isTextReader.value = true
+                        val content = withContext(Dispatchers.IO) { com.example.manga_readerver2.core.utils.EpubReader.getFullText(novelFile) }
+                        _allPages.value = listOf(ReaderPage.Text(content))
+                        _pageCount.value = 1
+                        _isLoading.value = false
+                        saveHistory()
+                        return@launch
+                    }
+                    
+                    // Online
+                    val source = sourceManager.get(manga.source) as? CatalogueSource
+                    if (source != null) {
+                        val sChapter = eu.kanade.tachiyomi.source.model.SChapter.create().apply {
+                            url = currentChapter.url
+                            name = currentChapter.name
+                        }
+                        val networkPages = withContext(Dispatchers.IO) { source.getPageList(sChapter) }
+                        
+                        if (networkPages.size == 1 && networkPages.first().imageUrl?.startsWith("vbook-text://") == true) {
+                            // This is VBook text content mapped into imageUrl
+                            _isTextReader.value = true
+                            val content = networkPages.first().imageUrl!!.removePrefix("vbook-text://")
+                            _allPages.value = listOf(ReaderPage.Text(content))
+                            _pageCount.value = 1
+                            _currentPage.value = 0
+                            _isLoading.value = false
+                            saveHistory()
                         } else {
-                            val pages = networkPages.mapIndexed { index, page -> 
-                                ReaderPage.Online(page.imageUrl ?: "", index) 
-                            }
+                            _isTextReader.value = false
+                            val pages = networkPages.mapIndexed { index, page -> ReaderPage.Online(page.imageUrl ?: "", index) }
                             _allPages.value = pages
                             _pageCount.value = pages.size
-                            loadPage(lastPage.coerceIn(0, pages.size - 1))
-                        }
-                        
-                        if (lastPage in 0 until _pageCount.value) {
-                            _currentPage.value = lastPage
+                            _currentPage.value = lastPage.coerceIn(0, pages.size - 1)
+                            loadPage(_currentPage.value)
                         }
                     } else {
-                        _errorMessage.value = "Không tìm thấy nguồn hoặc chương chưa được tải."
+                        _errorMessage.value = "Không tìm thấy nguồn"
                     }
                 } else {
-                    _errorMessage.value = "Chương đang được tải xuống. Vui lòng chờ."
+                    _errorMessage.value = "Chương đang tải..."
                 }
 
                 _isLoading.value = false
@@ -536,7 +524,7 @@ class ReaderScreenModel(
         val timeDiff = now - lastSavedTime
         if (index == lastSavedPageIndex && timeDiff < 5000) return 
 
-        screenModelScope.launch(Dispatchers.IO) {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             // Cập nhật lịch sử đọc
             val timeRead = if (startTime > 0) now - startTime else 0L
             if (timeRead > 0 || index != lastSavedPageIndex) {
@@ -552,6 +540,22 @@ class ReaderScreenModel(
                         lastPageRead = index.toLong(),
                         read = if (isRead) true else chapter.read
                     ))
+                    
+                    if (isRead) {
+                        manga?.let { m ->
+                            anilistManager.updateProgress(m.title, chapter.chapterNumber.toInt())
+                        }
+                    }
+                    
+                    if (isRead && downloadPreferences.autoDeleteAfterReading.get()) {
+                        val manga = mangaRepository.getMangaById(mangaId)
+                        if (manga != null) {
+                            val sourceName = sourceManager.get(manga.source)?.name ?: manga.source.toString()
+                            fileManager.deleteChapter(sourceName, manga.title, manga.id.toString(), chapter.name)
+                            val downloadCache = Injekt.get<com.example.manga_readerver2.core.download.DownloadCache>()
+                            downloadCache.removeChapter(manga.id, chapter.name)
+                        }
+                    }
                 }
             }
         }
@@ -596,6 +600,11 @@ class ReaderScreenModel(
         readerPreferences.fontSize.set(size)
     }
 
+    fun setAutoScrollSpeed(speed: Float) {
+        _autoScrollSpeed.value = speed
+        readerPreferences.autoScrollSpeed.set(speed)
+    }
+
     fun setLineSpacing(spacing: Float) {
         _lineSpacing.value = spacing
         readerPreferences.lineSpacing.set(spacing)
@@ -610,12 +619,72 @@ class ReaderScreenModel(
         readerPreferences.theme.set(theme)
     }
 
-    fun setCropBorders(enabled: Boolean) {
-        _cropBorders.value = enabled
+    fun setCropBorders(crop: Boolean) {
+        _cropBorders.value = crop
+        readerPreferences.cropBorders.set(crop)
+    }
+
+    fun setCustomColorFilter(enabled: Boolean) {
+        _customColorFilter.value = enabled
+        readerPreferences.customColorFilter.set(enabled)
+    }
+
+    fun setCustomColorFilterColor(color: Int) {
+        _customColorFilterColor.value = color
+        readerPreferences.customColorFilterColor.set(color)
+    }
+
+    fun setCustomColorFilterAlpha(alpha: Float) {
+        _customColorFilterAlpha.value = alpha
+        readerPreferences.customColorFilterAlpha.set(alpha)
+    }
+
+    fun setCustomColorFilterBlendMode(mode: Int) {
+        _customColorFilterBlendMode.value = mode
+        readerPreferences.customColorFilterBlendMode.set(mode)
+    }
+
+    fun setInvertColors(enabled: Boolean) {
+        _invertColors.value = enabled
+        readerPreferences.invertColors.set(enabled)
+    }
+
+    fun setGrayscale(enabled: Boolean) {
+        _grayscale.value = enabled
+        readerPreferences.grayscale.set(enabled)
+    }
+
+    fun setVolumeKeyNavigation(enabled: Boolean) {
+        _volumeKeyNavigation.value = enabled
+        readerPreferences.volumeKeyNavigation.set(enabled)
+    }
+
+    fun setDualPage(enabled: Boolean) {
+        _dualPage.value = enabled
+        readerPreferences.dualPage.set(enabled)
+    }
+
+    fun setWebtoonSidePadding(padding: Int) {
+        _webtoonSidePadding.value = padding
+        readerPreferences.webtoonSidePadding.set(padding)
     }
 
     fun setBrightness(value: Float) {
         _brightness.value = value
+    }
+
+    private val _isChapterBookmarked = MutableStateFlow(false)
+    val isChapterBookmarked = _isChapterBookmarked.asStateFlow()
+
+    fun toggleChapterBookmark() {
+        val chapter = currentChapter ?: return
+        screenModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val newBookmark = !chapter.bookmark
+            val updated = chapter.copy(bookmark = newBookmark)
+            mangaRepository.updateChapterReadStatus(updated)
+            currentChapter = updated
+            _isChapterBookmarked.value = newBookmark
+        }
     }
 
     fun navigateToChapter(chapter: Chapter) {
@@ -641,12 +710,12 @@ class ReaderScreenModel(
                 // Mark loading bằng copy() để trigger recompose
                 val loadingPages = _allPages.value.toMutableList()
                 if (index in loadingPages.indices) {
-                    loadingPages[index] = page.copy(isLoading = true)
+                    loadingPages[index] = page.copy(isLoading = true, hasError = false)
                     _allPages.value = loadingPages
                 }
 
                 val manga = mangaRepository.getMangaById(mangaId) ?: return@launch
-                val source = extensionManager.getSource(manga.source) as? CatalogueSource ?: return@launch
+                val source = sourceManager.get(manga.source) as? CatalogueSource ?: return@launch
 
                 val sChapter = eu.kanade.tachiyomi.source.model.SChapter.create().apply {
                     val chapter = currentChapter
@@ -667,7 +736,7 @@ class ReaderScreenModel(
                     val updatedPages = _allPages.value.toMutableList()
                     if (index in updatedPages.indices) {
                         (updatedPages[index] as? ReaderPage.Online)?.let {
-                            updatedPages[index] = it.copy(isLoading = false)
+                            updatedPages[index] = it.copy(isLoading = false, hasError = true)
                         }
                         _allPages.value = updatedPages
                     }
@@ -699,7 +768,8 @@ class ReaderScreenModel(
                         finalPages[index] = it.copy(
                             url = imageUrl,
                             localFile = onlineTempFile.absolutePath,
-                            isLoading = false
+                            isLoading = false,
+                            hasError = false
                         )
                     }
                     _allPages.value = finalPages
@@ -709,7 +779,7 @@ class ReaderScreenModel(
                 val errorPages = _allPages.value.toMutableList()
                 if (index in errorPages.indices) {
                     (errorPages[index] as? ReaderPage.Online)?.let {
-                        errorPages[index] = it.copy(isLoading = false)
+                        errorPages[index] = it.copy(isLoading = false, hasError = true)
                     }
                     _allPages.value = errorPages
                 }
@@ -796,7 +866,7 @@ class ReaderScreenModel(
         
         val manga = manga ?: return
         val currentChapter = currentChapter ?: return
-        val source = extensionManager.getSource(manga.source) ?: return
+        val source = sourceManager.get(manga.source) ?: return
         
         // Tìm các chương tiếp theo chưa đọc
         val nextChapters = currentMangaChapters
@@ -811,8 +881,7 @@ class ReaderScreenModel(
 
     override fun onDispose() {
         saveHistory()
-        // Fix BUG-15: Gọi release() để shutdown TTS engine và giải phóng TTS service connection
-        ttsManager.release()
+        ttsManager.stop()
         currentZipFile?.close()
         currentZipFile = null
         currentPdfRenderer?.close()

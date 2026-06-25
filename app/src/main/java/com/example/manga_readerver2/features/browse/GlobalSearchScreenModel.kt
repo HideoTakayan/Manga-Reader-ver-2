@@ -33,6 +33,7 @@ data class GlobalSearchState(
 
 class GlobalSearchScreenModel(
     private val extensionManager: ExtensionManager = Injekt.get(),
+    private val sourceManager: com.example.manga_readerver2.core.source.SourceManager = Injekt.get(),
     private val mangaRepository: MangaRepository = Injekt.get(),
     private val sourcePreferences: SourcePreferences = Injekt.get()
 ) : ScreenModel {
@@ -58,7 +59,7 @@ class GlobalSearchScreenModel(
         _state.update { it.copy(query = query, isSearching = true, results = emptyMap()) }
 
         val enabledLangs = sourcePreferences.enabledLanguages.get()
-        val allSources = extensionManager.sources.value.filterIsInstance<CatalogueSource>()
+        val allSources = sourceManager.getCatalogueSources()
         
         // VIP: Chỉ tìm trên các ngôn ngữ đã bật
         val sources = allSources.filter { source ->
@@ -82,7 +83,7 @@ class GlobalSearchScreenModel(
                                 source = source.id,
                                 url = sManga.url,
                                 title = sManga.title,
-                                thumbnailUrl = sManga.thumbnailUrl,
+                                thumbnailUrl = sManga.thumbnail_url,
                                 initialized = false
                             )
                         }
@@ -92,7 +93,7 @@ class GlobalSearchScreenModel(
                         updateResult(source, GlobalSearchResult.Error(e.message ?: "Unknown error"))
                     }
                 }
-            }.awaitAll()
+            }.awaitAll<Unit>()
             
             _state.update { it.copy(isSearching = false) }
         }

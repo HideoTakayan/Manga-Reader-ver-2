@@ -8,6 +8,7 @@ import com.example.manga_readerver2.domain.repository.MangaRepository
 import com.example.manga_readerver2.core.source.ExtensionManager
 import com.example.manga_readerver2.core.preference.LibraryPreferences
 import com.example.manga_readerver2.core.utils.FileManager
+import com.example.manga_readerver2.core.source.SourceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ class LibraryScreenModel(
     private val mangaRepository: MangaRepository = Injekt.get(),
     private val libraryPreferences: LibraryPreferences = Injekt.get(),
     private val extensionManager: ExtensionManager = Injekt.get(),
+    private val sourceManager: SourceManager = Injekt.get(),
     private val fileManager: FileManager = Injekt.get()
 ) : ScreenModel {
 
@@ -38,8 +40,9 @@ class LibraryScreenModel(
         DATE_ADDED, TITLE, LAST_UPDATE
     }
 
-    private val _sortMode = MutableStateFlow(SortMode.DATE_ADDED)
-    val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
+    val sortMode: StateFlow<SortMode> = libraryPreferences.sortMode.asFlow()
+        .map { SortMode.entries.getOrElse(it) { SortMode.DATE_ADDED } }
+        .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), SortMode.DATE_ADDED)
 
     val displayMode = libraryPreferences.displayMode.asFlow()
         .map { LibraryDisplayMode.entries.getOrElse(it) { LibraryDisplayMode.CompactGrid } }
@@ -84,7 +87,7 @@ class LibraryScreenModel(
         baseFlow.map { list ->
             list.map { item ->
                 val manga = item.manga
-                val sourceName = extensionManager.getSource(manga.source)?.name ?: "Local"
+                val sourceName = sourceManager.get(manga.source)?.name ?: "Local"
                 val mangaDir = fileManager.getMangaPath(sourceName, manga.title, manga.id.toString())
                 val hasDownloads = mangaDir.exists() && mangaDir.listFiles()?.any { it.extension == "cbz" || it.extension == "epub" } == true
 
@@ -113,7 +116,7 @@ class LibraryScreenModel(
             }
         }.flowOn(Dispatchers.IO)  // Fix: dùng flowOn thay vì withContext bên trong map
     }.flatMapLatest { it }
-    .combine(_sortMode) { list, sort ->
+    .combine(sortMode) { list, sort ->
         when (sort) {
             SortMode.DATE_ADDED -> list.sortedByDescending { it.manga.dateAdded }
             SortMode.TITLE -> list.sortedBy { it.manga.title }
@@ -130,6 +133,10 @@ class LibraryScreenModel(
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
+    }
+
+    fun setSortMode(mode: SortMode) {
+        libraryPreferences.sortMode.set(mode.ordinal)
     }
 
     fun unfollowManga(mangaId: Long) {
@@ -259,12 +266,19 @@ class LibraryScreenModel(
         }
     }
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    fun clearErrorMessage() {
+        _errorMessage.value = null
+    }
+
     private suspend fun updateMangaFromSource(manga: Manga) {
-        val source = extensionManager.getSource(manga.source) as? eu.kanade.tachiyomi.source.CatalogueSource ?: return
+        val source = sourceManager.get(manga.source) as? eu.kanade.tachiyomi.source.CatalogueSource ?: return
         val sManga = eu.kanade.tachiyomi.source.model.SManga.create().apply {
             url = manga.url
             title = manga.title
-            thumbnailUrl = manga.thumbnailUrl ?: ""
+            thumbnail_url = manga.thumbnailUrl ?: ""
         }
         
         try {
@@ -307,8 +321,10 @@ class LibraryScreenModel(
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            _errorMessage.value = "Lỗi cập nhật '${manga.title}': ${e.message ?: "Không xác định"}"
         }
     }
+
 
     fun importManga(context: android.content.Context, uri: android.net.Uri) {
         screenModelScope.launch {

@@ -87,6 +87,24 @@ class DownloadService : Service() {
                     return@withLock
                 }
 
+                val downloadPreferences = Injekt.get<com.example.manga_readerver2.core.preference.DownloadPreferences>()
+                if (downloadPreferences.downloadOnlyOverWifi.get()) {
+                    val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                    val network = connectivityManager.activeNetwork
+                    val capabilities = connectivityManager.getNetworkCapabilities(network)
+                    val isWifi = capabilities?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+                    
+                    if (!isWifi) {
+                        downloadManager.updateDownloadState(currentDownload, Download.State.ERROR)
+                        updateNotification("Lỗi tải: Yêu cầu Wi-Fi")
+                        
+                        // Stop service since we can't download anything on mobile data
+                        releaseWakeLock()
+                        stopSelf()
+                        return@withLock
+                    }
+                }
+
                 // Guard: job đang chạy thì không start thêm (double check)
                 if (downloadJob?.isActive == true) return@withLock
 
@@ -145,7 +163,7 @@ class DownloadService : Service() {
             val paragraphs = mutableListOf<String>()
             pages.forEach { page ->
                 val content = page.imageUrl ?: (source as? HttpSource)?.getImageUrl(page) ?: ""
-                paragraphs.add(content)
+                paragraphs.add(content.removePrefix("vbook-text://"))
             }
             val novelFile = fileManager.getChapterNovelPath(download.source.name, download.manga.title, download.manga.id.toString(), download.chapter.name)
             val tmpNovelFile = File(novelFile.absolutePath + ".tmp")

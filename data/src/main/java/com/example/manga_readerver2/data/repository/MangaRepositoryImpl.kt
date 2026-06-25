@@ -344,6 +344,12 @@ class MangaRepositoryImpl(
         }
     }
 
+    override suspend fun deleteHistoryByMangaId(mangaId: Long) {
+        withContext<Unit>(Dispatchers.IO) {
+            historyQueries.deleteHistoryByMangaId(mangaId)
+        }
+    }
+
     override fun getUpdates(): Flow<List<com.example.manga_readerver2.domain.model.Update>> {
         return chapterQueries.getUpdates()
             .asFlow()

@@ -2,4 +2,13 @@
 <resources>
 
     <style name="Theme.MangaReaderVer2" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Set the splash screen background -->
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <!-- Use windowSplashScreenAnimatedIcon to add a custom icon -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/app_icon</item>
+        <!-- Set the theme of the Activity that directly follows your splash screen. -->
+        <item name="postSplashScreenTheme">@style/Theme.MangaReaderVer2</item>
+    </style>
 </resources>

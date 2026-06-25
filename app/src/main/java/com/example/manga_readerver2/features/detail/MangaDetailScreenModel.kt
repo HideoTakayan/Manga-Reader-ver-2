@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import logcat.LogPriority
+import logcat.logcat
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import com.example.manga_readerver2.core.source.ExtensionManager
@@ -19,6 +22,7 @@ import eu.kanade.tachiyomi.source.Source
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import com.example.manga_readerver2.core.source.SourceManager
 import kotlinx.coroutines.Dispatchers
 
 enum class ChapterSort {
@@ -32,6 +36,7 @@ enum class ChapterFilter {
 class MangaDetailScreenModel(
     private val mangaRepository: MangaRepository = Injekt.get(),
     private val extensionManager: ExtensionManager = Injekt.get(),
+    private val sourceManager: SourceManager = Injekt.get(),
     private val downloadManager: DownloadManager = Injekt.get(),
     private val downloadCache: com.example.manga_readerver2.core.download.DownloadCache = Injekt.get(),
     // Fix BUG-13: Inject qua constructor, không gọi Injekt.get() trong hot path của Flow
@@ -101,21 +106,21 @@ class MangaDetailScreenModel(
             var manga = m
             _manga.value = manga
             _isLiked.value = manga.favorite
-            _source.value = extensionManager.getSource(manga.source)
+            _source.value = sourceManager.get(manga.source)
 
             // Nếu chưa initialized, tải thêm thông tin từ Source
             if (!manga.initialized) {
-                val source = extensionManager.getSource(manga.source)
+                val source = sourceManager.get(manga.source)
                 if (source != null) {
                     try {
                         val sManga = SManga.create().apply {
                             url = manga.url
                             title = manga.title
-                            thumbnailUrl = manga.thumbnailUrl
+                            thumbnail_url = manga.thumbnailUrl
                         }
 
                         // Tải chi tiết
-                        val networkManga = source.getMangaDetails(sManga)
+                        val networkManga = withContext(Dispatchers.IO) { source.getMangaDetails(sManga) }
                         manga = manga.copy(
                             author = networkManga.author ?: manga.author,
                             artist = networkManga.artist ?: manga.artist,
@@ -127,7 +132,9 @@ class MangaDetailScreenModel(
                         mangaRepository.updateMangaDetails(manga)
                         _manga.value = manga
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        val errorText = "Lỗi tải thông tin truyện: ${e.message}"
+                        logcat(LogPriority.ERROR) { "Error fetching manga details: ${e.message}\n${e.stackTraceToString().take(500)}" }
+                        _errorMessage.value = errorText
                     }
                 }
             }
@@ -175,7 +182,9 @@ class MangaDetailScreenModel(
                         }
                         mangaRepository.insertChapters(chapters)
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        val errorText = "Lỗi tải danh sách chương: ${e.message}"
+                        logcat(LogPriority.ERROR) { "Error fetching chapter list: ${e.message}\n${e.stackTraceToString().take(500)}" }
+                        _errorMessage.value = errorText
                     }
                 }
                 
@@ -190,7 +199,7 @@ class MangaDetailScreenModel(
         screenModelScope.launch {
             _isLoading.value = true
             val m = _manga.value ?: return@launch
-            val source = extensionManager.getSource(m.source) ?: return@launch
+            val source = sourceManager.get(m.source) ?: return@launch
             
             try {
                 val sManga = SManga.create().apply {
@@ -199,13 +208,13 @@ class MangaDetailScreenModel(
                 }
                 
                 // Update details
-                val networkManga = source.getMangaDetails(sManga)
+                val networkManga = withContext(Dispatchers.IO) { source.getMangaDetails(sManga) }
                 val updatedManga = m.copy(
                     author = networkManga.author ?: m.author,
                     artist = networkManga.artist ?: m.artist,
                     description = networkManga.description ?: m.description,
                     genre = networkManga.genre?.split(", ")?.map { it.trim() } ?: m.genre,
-                    thumbnailUrl = networkManga.thumbnailUrl ?: m.thumbnailUrl,
+                    thumbnailUrl = networkManga.thumbnail_url ?: m.thumbnailUrl,
                     status = networkManga.status.toLong(),
                     initialized = true 
                 )
@@ -213,7 +222,7 @@ class MangaDetailScreenModel(
                 _manga.value = updatedManga
                 
                 // Update chapters
-                val networkChapters = source.getChapterList(sManga)
+                val networkChapters = withContext(Dispatchers.IO) { source.getChapterList(sManga) }
                 val chapters = networkChapters.map { sChapter ->
                     val recognizedNumber = com.example.manga_readerver2.core.utils.ChapterRecognition.parseChapterNumber(sChapter.name)
                     val finalNumber = if (sChapter.chapter_number >= 0f) sChapter.chapter_number else recognizedNumber
@@ -235,6 +244,7 @@ class MangaDetailScreenModel(
                 _allChapters.value = mangaRepository.getChaptersByMangaId(m.id)
             } catch (e: Exception) {
                 e.printStackTrace()
+                _errorMessage.value = "Lỗi làm mới dữ liệu: ${e.message}"
             }
             _isLoading.value = false
         }
@@ -242,8 +252,28 @@ class MangaDetailScreenModel(
 
     fun downloadChapter(chapter: com.example.manga_readerver2.domain.model.Chapter) {
         val m = _manga.value ?: return
-        val source = extensionManager.getSource(m.source) ?: return
+        val source = sourceManager.get(m.source) ?: return
         downloadManager.downloadChapters(m, listOf(chapter), source)
+    }
+
+    fun downloadChapters(chapterIds: List<Long>) {
+        val m = _manga.value ?: return
+        val source = sourceManager.get(m.source) ?: return
+        val toDownload = _allChapters.value.filter { it.id in chapterIds }
+        if (toDownload.isNotEmpty()) {
+            downloadManager.downloadChapters(m, toDownload, source)
+        }
+    }
+
+    fun markChaptersRead(chapterIds: List<Long>, read: Boolean) {
+        screenModelScope.launch(Dispatchers.IO) {
+            val mangaId = _manga.value?.id ?: return@launch
+            chapterIds.forEach { id ->
+                val chapter = _allChapters.value.find { it.id == id } ?: return@forEach
+                mangaRepository.updateChapterReadStatus(chapter.copy(read = read))
+            }
+            _allChapters.value = mangaRepository.getChaptersByMangaId(mangaId)
+        }
     }
 
     fun toggleLike() {

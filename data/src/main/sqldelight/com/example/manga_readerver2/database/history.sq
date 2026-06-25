@@ -41,3 +41,8 @@ ON CONFLICT(chapter_id) DO UPDATE SET
 
 deleteAllHistory:
 DELETE FROM history;
+
+deleteHistoryByMangaId:
+DELETE FROM history WHERE chapter_id IN (
+    SELECT _id FROM chapters WHERE manga_id = ?
+);

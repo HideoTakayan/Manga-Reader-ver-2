@@ -3,6 +3,7 @@ package com.example.manga_readerver2.features.updates
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.*
@@ -44,6 +45,17 @@ class UpdatesScreen : Screen {
             topBar = {
                 TopAppBar(
                     title = { Text("Cập nhật", color = Color.White, fontWeight = FontWeight.ExtraBold) },
+                    actions = {
+                        if (updates.isNotEmpty()) {
+                            IconButton(onClick = { screenModel.markAllRead() }) {
+                                Icon(
+                                    Icons.Default.DoneAll,
+                                    contentDescription = "Đánh dấu tất cả đã đọc",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
                 )
             }

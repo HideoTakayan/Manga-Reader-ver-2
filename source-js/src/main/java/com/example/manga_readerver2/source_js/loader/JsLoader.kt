@@ -66,6 +66,16 @@ object JsLoader {
             readScript(config.script.toc, "toc")
             readScript(config.script.chap, "chap")
 
+            // Kiểm tra các script bắt buộc: toc + chap
+            val mandatoryScripts = listOf("toc", "chap")
+            val missingScripts = mandatoryScripts.filter { !scripts.containsKey(it) }
+            if (missingScripts.isNotEmpty()) {
+                logcat(LogPriority.WARN) {
+                    "[JsLoader] ${pluginDir.name}: Thiếu script bắt buộc: $missingScripts. " +
+                    "Plugin có thể tải được nhưng không đọc truyện được."
+                }
+            }
+
             fun normalizeLang(code: String?): String {
                 if (code.isNullOrBlank()) return "all"
                 val normalized = code.trim().lowercase()

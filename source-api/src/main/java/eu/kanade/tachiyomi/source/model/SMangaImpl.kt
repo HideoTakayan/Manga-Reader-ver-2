@@ -8,7 +8,7 @@ class SMangaImpl : SManga {
     override var description: String? = null
     override var genre: String? = null
     override var status: Int = 0
-    override var thumbnailUrl: String? = null
-    override var updateStrategy: UpdateStrategy = UpdateStrategy.ALWAYS_UPDATE
+    override var thumbnail_url: String? = null
+    override var update_strategy: UpdateStrategy = UpdateStrategy.ALWAYS_UPDATE
     override var initialized: Boolean = false
 }

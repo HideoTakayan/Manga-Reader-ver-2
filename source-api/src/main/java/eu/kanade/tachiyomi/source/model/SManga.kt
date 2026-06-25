@@ -10,9 +10,27 @@ interface SManga : Serializable {
     var description: String?
     var genre: String?
     var status: Int
-    var thumbnailUrl: String?
-    var updateStrategy: UpdateStrategy
+    var thumbnail_url: String?
+    var update_strategy: UpdateStrategy
     var initialized: Boolean
+
+    fun getGenres(): List<String>? {
+        if (genre.isNullOrBlank()) return null
+        return genre?.split(", ")?.map { it.trim() }?.filterNot { it.isBlank() }?.distinct()
+    }
+
+    fun copy() = create().also {
+        it.url = url
+        it.title = title
+        it.artist = artist
+        it.author = author
+        it.description = description
+        it.genre = genre
+        it.status = status
+        it.thumbnail_url = thumbnail_url
+        it.update_strategy = update_strategy
+        it.initialized = initialized
+    }
 
     companion object {
         const val UNKNOWN = 0

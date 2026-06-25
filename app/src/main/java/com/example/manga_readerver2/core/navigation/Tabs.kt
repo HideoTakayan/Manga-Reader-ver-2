@@ -22,7 +22,7 @@ object LibraryTab : Tab {
         @Composable
         get() {
             val icon = rememberVectorPainter(Icons.Default.CollectionsBookmark)
-            return remember { TabOptions(index = 0u, title = "Thư viện", icon = icon) }
+            return remember { TabOptions(index = 0u, title = "ThÆ° viá»‡n", icon = icon) }
         }
 
     @Composable
@@ -35,8 +35,8 @@ object UpdatesTab : Tab {
     override val options: TabOptions
         @Composable
         get() {
-            val icon = rememberVectorPainter(Icons.Default.NewReleases)
-            return remember { TabOptions(index = 1u, title = "Cập nhật", icon = icon) }
+            val icon = rememberVectorPainter(Icons.Filled.NewReleases)
+            return remember { TabOptions(index = 1u, title = "Cáº­p nháº­t", icon = icon) }
         }
 
     @Composable
@@ -50,7 +50,7 @@ object HistoryTab : Tab {
         @Composable
         get() {
             val icon = rememberVectorPainter(Icons.Default.History)
-            return remember { TabOptions(index = 2u, title = "Lịch sử", icon = icon) }
+            return remember { TabOptions(index = 2u, title = "Lá»‹ch sá»­", icon = icon) }
         }
 
     @Composable
@@ -64,7 +64,7 @@ object BrowseTab : Tab {
         @Composable
         get() {
             val icon = rememberVectorPainter(Icons.Default.Explore)
-            return remember { TabOptions(index = 3u, title = "Khám phá", icon = icon) }
+            return remember { TabOptions(index = 3u, title = "KhĂ¡m phĂ¡", icon = icon) }
         }
 
     @Composable
@@ -78,7 +78,7 @@ object SettingsTab : Tab {
         @Composable
         get() {
             val icon = rememberVectorPainter(Icons.Default.MoreHoriz)
-            return remember { TabOptions(index = 4u, title = "Thêm", icon = icon) }
+            return remember { TabOptions(index = 4u, title = "ThĂªm", icon = icon) }
         }
 
     @Composable
@@ -86,3 +86,6 @@ object SettingsTab : Tab {
         SettingsScreen().Content()
     }
 }
+
+
+

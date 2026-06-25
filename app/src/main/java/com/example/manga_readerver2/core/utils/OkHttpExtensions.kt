@@ -56,3 +56,7 @@ inline fun <reified T> Json.decodeFromResponse(response: Response): T {
     val body = response.body?.string() ?: throw Exception("Empty response body")
     return this.decodeFromString(body)
 }
+
+inline fun <reified T> Response.parseAs(json: Json): T {
+    return json.decodeFromResponse(this)
+}

@@ -1,10 +1,11 @@
-package com.example.manga_readerver2.features.library
+﻿package com.example.manga_readerver2.features.library
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,10 +34,10 @@ class CategoryManagerScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Chỉnh sửa danh mục", color = Color.White) },
+                    title = { Text("Chá»‰nh sá»­a danh má»¥c", color = Color.White) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                         }
                     },
                     actions = {
@@ -63,19 +64,19 @@ class CategoryManagerScreen : Screen {
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
-                    Divider(color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                 }
             }
 
             if (showAddDialog) {
                 AlertDialog(
                     onDismissRequest = { showAddDialog = false },
-                    title = { Text("Danh mục mới") },
+                    title = { Text("Danh má»¥c má»›i") },
                     text = {
                         TextField(
                             value = newCategoryName,
                             onValueChange = { newCategoryName = it },
-                            placeholder = { Text("Tên danh mục") },
+                            placeholder = { Text("TĂªn danh má»¥c") },
                             singleLine = true
                         )
                     },
@@ -87,12 +88,12 @@ class CategoryManagerScreen : Screen {
                                 showAddDialog = false
                             }
                         }) {
-                            Text("Thêm", color = PrimaryOrange)
+                            Text("ThĂªm", color = PrimaryOrange)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showAddDialog = false }) {
-                            Text("Hủy")
+                            Text("Há»§y")
                         }
                     }
                 )
@@ -100,3 +101,5 @@ class CategoryManagerScreen : Screen {
         }
     }
 }
+
+

@@ -25,6 +25,14 @@ class FileManager(private val context: Context) {
         return dir
     }
 
+    fun getLocalSourcePath(): File {
+        val dir = File(getRootPath(), "local")
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return dir
+    }
+
     fun getMangaPath(sourceName: String, mangaTitle: String, mangaId: String): File {
         val sourceDir = File(getDownloadPath(), sanitizeFileName(sourceName))
         if (!sourceDir.exists()) sourceDir.mkdirs()
@@ -64,6 +72,17 @@ class FileManager(private val context: Context) {
 
     fun deleteManga(sourceName: String, mangaTitle: String, mangaId: String) {
         getMangaPath(sourceName, mangaTitle, mangaId).deleteRecursively()
+    }
+
+    fun deleteChapter(sourceName: String, mangaTitle: String, mangaId: String, chapterTitle: String) {
+        val cbz = getChapterCbzPath(sourceName, mangaTitle, mangaId, chapterTitle)
+        if (cbz.exists()) cbz.delete()
+        
+        val epub = getChapterNovelPath(sourceName, mangaTitle, mangaId, chapterTitle)
+        if (epub.exists()) epub.delete()
+        
+        val dir = getChapterPath(sourceName, mangaTitle, mangaId, chapterTitle)
+        if (dir.exists()) dir.deleteRecursively()
     }
 
     fun getCacheDir(): File {

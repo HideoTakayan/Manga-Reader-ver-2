@@ -25,7 +25,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -49,7 +50,6 @@ kotlin {
     jvmToolchain(21)
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 
@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
@@ -80,6 +81,9 @@ dependencies {
 
     // DataStore (Preferences - thay SharedPreferences)
     implementation(libs.androidx.datastore.preferences)
+
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

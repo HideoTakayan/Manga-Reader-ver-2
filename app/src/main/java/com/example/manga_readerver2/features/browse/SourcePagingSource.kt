@@ -40,7 +40,7 @@ class SourcePagingSource(
                     source = sourceId,
                     url = sManga.url,
                     title = sManga.title,
-                    thumbnailUrl = sManga.thumbnailUrl,
+                    thumbnailUrl = sManga.thumbnail_url,
                     artist = null,
                     author = null,
                     description = null,
@@ -65,7 +65,8 @@ class SourcePagingSource(
                 nextKey = if (response.hasNextPage) page + 1 else null
             )
         } catch (e: Exception) {
-            LoadResult.Error(e)
+            val fullError = "${e.javaClass.simpleName}: ${e.message}\n${e.stackTraceToString().take(500)}"
+            LoadResult.Error(Exception(fullError, e))
         }
     }
 

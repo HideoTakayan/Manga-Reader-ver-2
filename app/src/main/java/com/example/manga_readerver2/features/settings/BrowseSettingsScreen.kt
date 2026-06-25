@@ -1,11 +1,11 @@
-package com.example.manga_readerver2.features.settings
+﻿package com.example.manga_readerver2.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -37,10 +37,10 @@ class BrowseSettingsScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Duyệt", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Duyá»‡t", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -54,7 +54,7 @@ class BrowseSettingsScreen : Screen {
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    "Tiện ích mở rộng",
+                    "Tiá»‡n Ă­ch má»Ÿ rá»™ng",
                     color = PrimaryOrange,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
@@ -67,7 +67,7 @@ class BrowseSettingsScreen : Screen {
                 )
                 
                 Text(
-                    "Lưu ý: Cài đặt nội bộ sẽ nạp extension trực tiếp từ ứng dụng, không cần cài đặt qua hệ thống Android. Điều này giúp quá trình cài đặt mượt mà hơn nhưng có thể không tương thích với một số dòng máy cũ.",
+                    "LÆ°u Ă½: CĂ i Ä‘áº·t ná»™i bá»™ sáº½ náº¡p extension trá»±c tiáº¿p tá»« á»©ng dá»¥ng, khĂ´ng cáº§n cĂ i Ä‘áº·t qua há»‡ thá»‘ng Android. Äiá»u nĂ y giĂºp quĂ¡ trĂ¬nh cĂ i Ä‘áº·t mÆ°á»£t mĂ  hÆ¡n nhÆ°ng cĂ³ thá»ƒ khĂ´ng tÆ°Æ¡ng thĂ­ch vá»›i má»™t sá»‘ dĂ²ng mĂ¡y cÅ©.",
                     color = Color.Gray,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
@@ -82,10 +82,10 @@ class BrowseSettingsScreen : Screen {
         onTypeSelected: (Int) -> Unit
     ) {
         var showDialog by remember { mutableStateOf(false) }
-        val types = listOf("Trình cài đặt hệ thống", "Trình cài đặt nội bộ (Mihon Style)")
+        val types = listOf("TrĂ¬nh cĂ i Ä‘áº·t há»‡ thá»‘ng", "TrĂ¬nh cĂ i Ä‘áº·t ná»™i bá»™ (Mihon Style)")
         
         ListItem(
-            headlineContent = { Text("Trình cài đặt phần mở rộng", color = Color.White) },
+            headlineContent = { Text("TrĂ¬nh cĂ i Ä‘áº·t pháº§n má»Ÿ rá»™ng", color = Color.White) },
             supportingContent = { Text(types[selectedType], color = Color.Gray) },
             modifier = Modifier.clickable { showDialog = true },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -94,7 +94,7 @@ class BrowseSettingsScreen : Screen {
         if (showDialog) {
             AlertDialog(
                 onDismissRequest = { showDialog = false },
-                title = { Text("Chọn trình cài đặt") },
+                title = { Text("Chá»n trĂ¬nh cĂ i Ä‘áº·t") },
                 text = {
                     Column {
                         types.forEachIndexed { index, type ->
@@ -127,3 +127,5 @@ class BrowseSettingsScreen : Screen {
         }
     }
 }
+
+

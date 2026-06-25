@@ -20,10 +20,12 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.map
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import com.example.manga_readerver2.core.source.SourceManager
 
 class CatalogueScreenModel(
     private val mangaRepository: MangaRepository = Injekt.get(),
-    private val extensionManager: ExtensionManager = Injekt.get()
+    private val extensionManager: ExtensionManager = Injekt.get(),
+    private val sourceManager: SourceManager = Injekt.get()
 ) : ScreenModel {
 
     private val _listing = MutableStateFlow<Listing>(Listing.Popular)
@@ -46,9 +48,13 @@ class CatalogueScreenModel(
 
     private var currentPager: Flow<PagingData<Manga>> = emptyFlow()
 
+    private val _sourceId = MutableStateFlow<Long?>(null)
+    val sourceId = _sourceId.asStateFlow()
+
     fun initSource(sourceId: Long) {
-        val currentSource = extensionManager.getSource(sourceId) as? CatalogueSource
+        val currentSource = sourceManager.get(sourceId) as? CatalogueSource
         source = currentSource
+        _sourceId.value = sourceId  // triggers recomposition
         currentSource?.let {
             _filters.value = it.getFilterList()
         }

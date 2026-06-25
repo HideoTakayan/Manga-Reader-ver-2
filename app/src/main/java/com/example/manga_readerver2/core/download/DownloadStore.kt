@@ -22,7 +22,7 @@ import java.io.File
 class DownloadStore(
     private val context: Context,
     private val mangaRepository: MangaRepository = Injekt.get(),
-    private val extensionManager: ExtensionManager = Injekt.get()
+    private val sourceManager: com.example.manga_readerver2.core.source.SourceManager = Injekt.get()
 ) {
     private val storeFile = File(context.filesDir, "download_queue.json")
     private val json = Json { ignoreUnknownKeys = true }
@@ -58,7 +58,7 @@ class DownloadStore(
                 val manga = mangaRepository.getMangaById(obj.mangaId) ?: continue
                 val chapters = mangaRepository.getChaptersByMangaId(obj.mangaId)
                 val chapter = chapters.find { it.id == obj.chapterId } ?: continue
-                val source = extensionManager.getSource(obj.sourceId) ?: continue
+                val source = sourceManager.get(obj.sourceId) ?: continue
                 
                 result.add(Download(source, manga, chapter))
             }

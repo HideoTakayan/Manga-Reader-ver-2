@@ -8,9 +8,10 @@ import rx.Subscription
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-suspend fun <T> Observable<T>.awaitSingle(): T = single().awaitOne()
+// awaitSingle() đã được định nghĩa trong RxCoroutineBridge.kt
+// File này chỉ giữ lại awaitOne để tương thích backward
 
-private suspend fun <T> Observable<T>.awaitOne(): T = suspendCancellableCoroutine { cont ->
+internal suspend fun <T> Observable<T>.awaitOneInternal(): T = suspendCancellableCoroutine { cont ->
     cont.unsubscribeOnCancellation(
         subscribe(
             object : Subscriber<T>() {

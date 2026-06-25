@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+﻿@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 package com.example.manga_readerver2.features.detail
 
 import android.content.Intent
@@ -97,8 +97,8 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                     onBack = { navigator.pop() },
                     onDownloadQueue = { navigator.push(DownloadQueueScreen()) },
                     onRefresh = { screenModel.refreshManual() },
-                // isHttpSource: chỉ true khi là HTTP source thật sự (APK extension)
-                // VBook JS source cũng có source ID != 0 nên không dùng `source != 0L`
+                // isHttpSource: chĂ¡Â»â€° true khi lÄ‚Â  HTTP source thĂ¡ÂºÂ­t sĂ¡Â»Â± (APK extension)
+                // VBook JS source cĂ…Â©ng cÄ‚Â³ source ID != 0 nÄ‚Âªn khÄ‚Â´ng dÄ‚Â¹ng `source != 0L`
                 isHttpSource = source is eu.kanade.tachiyomi.source.online.HttpSource,
                 isScrolled = isScrolled
                 )
@@ -112,7 +112,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                         }
                     }
                     errorMessage != null && manga == null -> {
-                        // Hiện lỗi rõ ràng thay vì blank screen
+                        // HiĂ¡Â»â€¡n lĂ¡Â»â€”i rÄ‚Âµ rÄ‚Â ng thay vÄ‚Â¬ blank screen
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -126,14 +126,14 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                                     modifier = Modifier.size(64.dp)
                                 )
                                 Text(
-                                    text = errorMessage ?: "Lỗi không xác định",
+                                    text = errorMessage ?: "LĂ¡Â»â€”i khÄ‚Â´ng xÄ‚Â¡c Ă„â€˜Ă¡Â»â€¹nh",
                                     color = Color.Gray,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                                 Button(
                                     onClick = { navigator.pop() },
                                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
-                                ) { Text("Quay lại") }
+                                ) { Text("Quay lĂ¡ÂºÂ¡i") }
                             }
                         }
                     }
@@ -147,10 +147,10 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                         isLiked = isLiked,
                         onFavoriteClick = {
                             if (isLiked) {
-                                // Đang liked → mở dialog để đổi category hoặc unfavorite
+                                // Ă„Âang liked Ă¢â€ â€™ mĂ¡Â»Å¸ dialog Ă„â€˜Ă¡Â»Æ’ Ă„â€˜Ă¡Â»â€¢i category hoĂ¡ÂºÂ·c unfavorite
                                 showCategoryDialog = true
                             } else {
-                                // Chưa liked → toggle favorite rồi mở dialog chọn category (chuẩn Mihon)
+                                // ChĂ†Â°a liked Ă¢â€ â€™ toggle favorite rĂ¡Â»â€œi mĂ¡Â»Å¸ dialog chĂ¡Â»Ân category (chuĂ¡ÂºÂ©n Mihon)
                                 screenModel.toggleLike()
                                 showCategoryDialog = true
                             }
@@ -168,7 +168,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mangaUrl))
                                 context.startActivity(intent)
                             } else {
-                                Toast.makeText(context, "Nguồn không hỗ trợ xem trên trình duyệt", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "NguĂ¡Â»â€œn khÄ‚Â´ng hĂ¡Â»â€” trĂ¡Â»Â£ xem trÄ‚Âªn trÄ‚Â¬nh duyĂ¡Â»â€¡t", Toast.LENGTH_SHORT).show()
                             }
                         },
                         onShareClick = {
@@ -179,15 +179,15 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                                     type = "text/plain"
                                     putExtra(Intent.EXTRA_TEXT, "${manga.title}\n$mangaUrl")
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Chia sẻ truyện"))
+                                context.startActivity(Intent.createChooser(intent, "Chia sĂ¡ÂºÂ» truyĂ¡Â»â€¡n"))
                             }
                         },
                         onTrackClick = {
-                            Toast.makeText(context, "Chức năng theo dõi sẽ sớm ra mắt!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "ChĂ¡Â»Â©c nĂ„Æ’ng theo dÄ‚Âµi sĂ¡ÂºÂ½ sĂ¡Â»â€ºm ra mĂ¡ÂºÂ¯t!", Toast.LENGTH_SHORT).show()
                         },
                         onTagClick = { tag ->
-                            // TODO: Chuyển đến màn hình tìm kiếm với tag
-                            Toast.makeText(context, "Tìm kiếm tag: $tag", Toast.LENGTH_SHORT).show()
+                            // TODO: ChuyĂ¡Â»Æ’n Ă„â€˜Ă¡ÂºÂ¿n mÄ‚Â n hÄ‚Â¬nh tÄ‚Â¬m kiĂ¡ÂºÂ¿m vĂ¡Â»â€ºi tag
+                            Toast.makeText(context, "TÄ‚Â¬m kiĂ¡ÂºÂ¿m tag: $tag", Toast.LENGTH_SHORT).show()
                         }
                     )
 
@@ -207,7 +207,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                             ) {
                                 Icon(Icons.Default.PlayArrow, null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (nextToRead.read) "Bắt đầu lại" else "Đọc tiếp", fontWeight = FontWeight.Bold)
+                                Text(if (nextToRead.read) "BĂ¡ÂºÂ¯t Ă„â€˜Ă¡ÂºÂ§u lĂ¡ÂºÂ¡i" else "Ă„ÂĂ¡Â»Âc tiĂ¡ÂºÂ¿p", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -255,7 +255,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
     private fun Manga.toSManga() = eu.kanade.tachiyomi.source.model.SManga.create().apply {
         url = this@toSManga.url
         title = this@toSManga.title
-        thumbnailUrl = this@toSManga.thumbnailUrl
+        thumbnail_url = this@toSManga.thumbnailUrl
         author = this@toSManga.author
         artist = this@toSManga.artist
         description = this@toSManga.description
@@ -421,9 +421,9 @@ fun MangaDetailContent(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         val (statusIcon, statusLabel, statusColor) = when (manga.status) {
-                            1L -> Triple(Icons.Default.Schedule, "Đang tiến hành", Color(0xFF4CAF50))
-                            2L -> Triple(Icons.Default.CheckCircle, "Đã hoàn thành", Color(0xFF2196F3))
-                            else -> Triple(Icons.Default.Help, "Không rõ", Color.Gray)
+                            1L -> Triple(Icons.Default.Schedule, "Ă„Âang tiĂ¡ÂºÂ¿n hÄ‚Â nh", Color(0xFF4CAF50))
+                            2L -> Triple(Icons.Default.CheckCircle, "Ă„ÂÄ‚Â£ hoÄ‚Â n thÄ‚Â nh", Color(0xFF2196F3))
+                            else -> Triple(Icons.Default.Help, "KhÄ‚Â´ng rÄ‚Âµ", Color.Gray)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(statusIcon, null, tint = statusColor, modifier = Modifier.size(16.dp))
@@ -459,13 +459,13 @@ fun MangaDetailContent(
             ) {
                 MangaActionButton(
                     icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    label = if (isLiked) "Favorited" else "Favorite",
-                    color = if (isLiked) Color.Red else Color.White,
+                    label = if (isLiked) "Trong thÆ° viá»‡n" else "ThĂªm vĂ o",
+                    color = if (isLiked) PrimaryOrange else Color.White,
                     onClick = onFavoriteClick
                 )
                 MangaActionButton(Icons.Default.Public, "WebView", Color.White, onClick = onWebViewClick)
-                MangaActionButton(Icons.Default.Share, "Share", Color.White, onClick = onShareClick)
                 MangaActionButton(Icons.Default.TrackChanges, "Tracking", Color.White, onClick = onTrackClick)
+                MangaActionButton(Icons.Default.Share, "Share", Color.White, onClick = onShareClick)
             }
         }
 
@@ -524,13 +524,13 @@ fun MangaDetailContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "${chapters.size} Chapters",
+                    text = "${chapters.size} chÆ°Æ¡ng",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp
                 )
                 IconButton(onClick = onFilterClick) {
-                    Icon(Icons.Default.FilterList, null, tint = Color.White)
+                    Icon(Icons.Default.Sort, null, tint = Color.White)
                 }
             }
             HorizontalDivider(
@@ -597,9 +597,9 @@ fun ChapterItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 val cleanName = com.example.manga_readerver2.core.utils.ChapterRecognition.getDisplayTitle(chapter.name)
-                // Nếu tên gốc có chứa các từ thêm (như tiêu đề phụ), ta có thể hiển thị thêm, nhưng 
-                // tạm thời theo đúng logic của manga-reader: lấy tên sạch
-                // Nếu cleanName quá ngắn, ta vẫn có thể dùng cleanName
+                // NĂ¡ÂºÂ¿u tÄ‚Âªn gĂ¡Â»â€˜c cÄ‚Â³ chĂ¡Â»Â©a cÄ‚Â¡c tĂ¡Â»Â« thÄ‚Âªm (nhĂ†Â° tiÄ‚Âªu Ă„â€˜Ă¡Â»Â phĂ¡Â»Â¥), ta cÄ‚Â³ thĂ¡Â»Æ’ hiĂ¡Â»Æ’n thĂ¡Â»â€¹ thÄ‚Âªm, nhĂ†Â°ng 
+                // tĂ¡ÂºÂ¡m thĂ¡Â»Âi theo Ă„â€˜Ä‚Âºng logic cĂ¡Â»Â§a manga-reader: lĂ¡ÂºÂ¥y tÄ‚Âªn sĂ¡ÂºÂ¡ch
+                // NĂ¡ÂºÂ¿u cleanName quÄ‚Â¡ ngĂ¡ÂºÂ¯n, ta vĂ¡ÂºÂ«n cÄ‚Â³ thĂ¡Â»Æ’ dÄ‚Â¹ng cleanName
                 
                 Text(
                     text = cleanName.ifEmpty { chapter.name },
@@ -609,7 +609,7 @@ fun ChapterItem(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                // Hiển thị tên gốc nhỏ mờ ở dưới nếu nó khác với cleanName
+                // HiĂ¡Â»Æ’n thĂ¡Â»â€¹ tÄ‚Âªn gĂ¡Â»â€˜c nhĂ¡Â»Â mĂ¡Â»Â Ă¡Â»Å¸ dĂ†Â°Ă¡Â»â€ºi nĂ¡ÂºÂ¿u nÄ‚Â³ khÄ‚Â¡c vĂ¡Â»â€ºi cleanName
                 if (cleanName != chapter.name && !chapter.name.equals(cleanName, ignoreCase = true)) {
                     Text(
                         text = chapter.name,
@@ -630,7 +630,7 @@ fun ChapterItem(
                 )
             }
 
-            // Download Icon: chỉ hiện với HTTP source thật sự (không hiện cho Local hoặc VBook JS)
+            // Download Icon: chĂ¡Â»â€° hiĂ¡Â»â€¡n vĂ¡Â»â€ºi HTTP source thĂ¡ÂºÂ­t sĂ¡Â»Â± (khÄ‚Â´ng hiĂ¡Â»â€¡n cho Local hoĂ¡ÂºÂ·c VBook JS)
             if (isHttpSource) {
                 IconButton(
                     onClick = onDownload,
@@ -692,49 +692,49 @@ fun ChapterSettingsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Cài đặt chương", color = Color.White) },
+        title = { Text("CÄ‚Â i Ă„â€˜Ă¡ÂºÂ·t chĂ†Â°Ă†Â¡ng", color = Color.White) },
         text = {
             Column {
-                Text("Sắp xếp theo", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
+                Text("SĂ¡ÂºÂ¯p xĂ¡ÂºÂ¿p theo", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
                 Row {
                     FilterChip(
                         selected = currentSort == com.example.manga_readerver2.features.detail.ChapterSort.LATEST,
                         onClick = { onSortChange(com.example.manga_readerver2.features.detail.ChapterSort.LATEST) },
-                        label = { Text("Mới nhất") }
+                        label = { Text("MĂ¡Â»â€ºi nhĂ¡ÂºÂ¥t") }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentSort == com.example.manga_readerver2.features.detail.ChapterSort.OLDEST,
                         onClick = { onSortChange(com.example.manga_readerver2.features.detail.ChapterSort.OLDEST) },
-                        label = { Text("Cũ nhất") }
+                        label = { Text("CĂ…Â© nhĂ¡ÂºÂ¥t") }
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Lọc", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
+                Text("LĂ¡Â»Âc", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
                 Row {
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.ALL,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.ALL) },
-                        label = { Text("Tất cả") }
+                        label = { Text("TĂ¡ÂºÂ¥t cĂ¡ÂºÂ£") }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.UNREAD,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.UNREAD) },
-                        label = { Text("Chưa đọc") }
+                        label = { Text("ChĂ†Â°a Ă„â€˜Ă¡Â»Âc") }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.DOWNLOADED,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.DOWNLOADED) },
-                        label = { Text("Đã tải") }
+                        label = { Text("Ă„ÂÄ‚Â£ tĂ¡ÂºÂ£i") }
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Đóng", color = PrimaryOrange)
+                Text("Ă„ÂÄ‚Â³ng", color = PrimaryOrange)
             }
         },
         containerColor = Color(0xFF2B2B2B),
