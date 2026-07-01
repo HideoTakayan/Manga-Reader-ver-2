@@ -36,24 +36,24 @@ class LibrarySettingsScreen : Screen {
         var updateInterval by remember { mutableStateOf(libraryPreferences.updateInterval.get()) }
         var wifiOnly by remember { mutableStateOf(libraryPreferences.updateWifiOnly.get()) }
 
-        // Má»Ÿ Dialog chá»n Táº§n suáº¥t
+        // Mở Dialog chọn Tần suất
         var showIntervalDialog by remember { mutableStateOf(false) }
 
         val intervalOptions = listOf(
-            0 to "Thá»§ cĂ´ng",
-            12 to "Má»—i 12 giá»",
-            24 to "Má»—i 24 giá»",
-            48 to "Má»—i 48 giá»"
+            0 to "Thủ công",
+            12 to "Mỗi 12 giờ",
+            24 to "Mỗi 24 giờ",
+            48 to "Mỗi 48 giờ"
         )
 
         Scaffold(
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("ThÆ° viá»‡n", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Thư viện", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay láº¡i", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -66,16 +66,16 @@ class LibrarySettingsScreen : Screen {
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                SettingsSectionHeader(title = "Cáº­p nháº­t ngáº§m")
+                SettingsSectionHeader(title = "Cập nhật ngầm")
 
-                // Chá»n Táº§n suáº¥t
+                // Chọn Tần suất
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable { showIntervalDialog = true },
                     color = Color.Transparent
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
-                        Text("Táº§n suáº¥t cáº­p nháº­t", color = Color.White, fontSize = 16.sp)
-                        val currentText = intervalOptions.find { it.first == updateInterval }?.second ?: "Thá»§ cĂ´ng"
+                        Text("Tần suất cập nhật", color = Color.White, fontSize = 16.sp)
+                        val currentText = intervalOptions.find { it.first == updateInterval }?.second ?: "Thủ công"
                         Text(currentText, color = Color.Gray, fontSize = 13.sp)
                     }
                 }
@@ -97,8 +97,8 @@ class LibrarySettingsScreen : Screen {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Chá»‰ cáº­p nháº­t khi dĂ¹ng Wi-Fi", color = if (updateInterval == 0) Color.DarkGray else Color.White, fontSize = 16.sp)
-                            Text("Tiáº¿t kiá»‡m dá»¯ liá»‡u máº¡ng di Ä‘á»™ng", color = Color.Gray, fontSize = 13.sp)
+                            Text("Chỉ cập nhật khi dùng Wi-Fi", color = if (updateInterval == 0) Color.DarkGray else Color.White, fontSize = 16.sp)
+                            Text("Tiết kiệm dữ liệu mạng di động", color = Color.Gray, fontSize = 13.sp)
                         }
                         Switch(
                             checked = wifiOnly,
@@ -121,7 +121,7 @@ class LibrarySettingsScreen : Screen {
         if (showIntervalDialog) {
             AlertDialog(
                 onDismissRequest = { showIntervalDialog = false },
-                title = { Text("Táº§n suáº¥t cáº­p nháº­t") },
+                title = { Text("Tần suất cập nhật") },
                 text = {
                     Column {
                         intervalOptions.forEach { (value, label) ->

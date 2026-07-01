@@ -32,7 +32,7 @@ class SettingsDetailScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("CĂ i Ä‘áº·t", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Cài đặt", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -50,56 +50,56 @@ class SettingsDetailScreen : Screen {
             ) {
                 SettingsCategoryItem(
                     icon = Icons.Default.Palette,
-                    title = "Hiá»ƒn thá»‹",
-                    subtitle = "Giao diá»‡n, ngĂ y thĂ¡ng",
+                    title = "Hiển thị",
+                    subtitle = "Giao diện, ngày tháng",
                     onClick = { navigator.push(DisplaySettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.CollectionsBookmark,
-                    title = "ThÆ° viá»‡n",
-                    subtitle = "Cáº­p nháº­t, danh má»¥c, nhĂ£n",
+                    title = "Thư viện",
+                    subtitle = "Cập nhật, danh mục, nhãn",
                     onClick = { navigator.push(LibrarySettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.ChromeReaderMode,
-                    title = "TrĂ¬nh Ä‘á»c",
-                    subtitle = "Cháº¿ Ä‘á»™ Ä‘á»c, Ä‘iá»u hÆ°á»›ng, hiá»ƒn thá»‹",
+                    title = "Trình đọc",
+                    subtitle = "Chế độ đọc, điều hướng, hiển thị",
                     onClick = { navigator.push(ReaderSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Download,
-                    title = "Táº£i xuá»‘ng",
-                    subtitle = "Vá»‹ trĂ­ táº£i, tá»± Ä‘á»™ng xĂ³a",
+                    title = "Tải xuống",
+                    subtitle = "Vị trí tải, tự động xóa",
                     onClick = { navigator.push(DownloadSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Explore,
-                    title = "Duyá»‡t",
-                    subtitle = "Nguá»“n truyá»‡n, tiá»‡n Ă­ch má»Ÿ rá»™ng",
+                    title = "Duyệt",
+                    subtitle = "Nguồn truyện, tiện ích mở rộng",
                     onClick = { navigator.push(BrowseSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Security,
-                    title = "Báº£o máº­t",
-                    subtitle = "KhĂ³a á»©ng dá»¥ng, vĂ¢n tay",
+                    title = "Bảo mật",
+                    subtitle = "Khóa ứng dụng, vân tay",
                     onClick = { navigator.push(SecuritySettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Sync,
-                    title = "Theo dĂµi",
+                    title = "Theo dõi",
                     subtitle = "MyAnimeList, AniList",
                     onClick = { navigator.push(TrackSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Storage,
-                    title = "Dá»¯ liá»‡u vĂ  Sao lÆ°u",
-                    subtitle = "Sao lÆ°u thÆ° viá»‡n, xĂ³a bá»™ nhá»› Ä‘á»‡m",
+                    title = "Dữ liệu và Sao lưu",
+                    subtitle = "Sao lưu thư viện, xóa bộ nhớ đệm",
                     onClick = { navigator.push(DataSettingsScreen()) }
                 )
                 SettingsCategoryItem(
                     icon = Icons.Default.Code,
-                    title = "NĂ¢ng cao",
-                    subtitle = "Dá»n dáº¹p database, log",
+                    title = "Nâng cao",
+                    subtitle = "Dọn dẹp database, log",
                     onClick = { navigator.push(AdvancedSettingsScreen()) }
                 )
             }

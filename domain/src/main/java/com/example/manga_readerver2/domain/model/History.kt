@@ -6,5 +6,6 @@ data class History(
     val mangaTitle: String,
     val chapterName: String,
     val thumbnailUrl: String?,
+    val sourceId: Long,
     val lastRead: Long
 )

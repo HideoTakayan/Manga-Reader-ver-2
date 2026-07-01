@@ -74,7 +74,7 @@ Scaffold(
                         TextField(
                             value = query,
                             onValueChange = { query = it },
-                            placeholder = { Text("TĂ¬m kiáº¿m toĂ n cáº§u...", color = Color.Gray) },
+                            placeholder = { Text("Tìm kiếm toàn cầu...", color = Color.Gray) },
                             modifier = Modifier.weight(1f),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -114,7 +114,7 @@ Scaffold(
                 if (resultsList.isEmpty() && !state.isSearching) {
                     item {
                         Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Nháº­p tá»« khĂ³a Ä‘á»ƒ tĂ¬m kiáº¿m trĂªn táº¥t cáº£ nguá»“n", color = Color.Gray)
+                            Text("Nhập từ khóa để tìm kiếm trên tất cả nguồn", color = Color.Gray)
                         }
                     }
                 }
@@ -190,7 +190,7 @@ Scaffold(
                 }
                 Icon(
                     Icons.Default.ChevronRight, 
-                    contentDescription = "Xem táº¥t cáº£", 
+                    contentDescription = "Xem tất cả", 
                     tint = Color.Gray,
                     modifier = Modifier.size(20.dp)
                 )
@@ -205,7 +205,7 @@ Scaffold(
                     }
                 }
                 is GlobalSearchResult.Error -> {
-                    Text("Lá»—i: ${result.message}", color = Color.Red, fontSize = 12.sp)
+                    Text("Lỗi: ${result.message}", color = Color.Red, fontSize = 12.sp)
                 }
                 is GlobalSearchResult.Success -> {
                     LazyRow(
@@ -229,7 +229,7 @@ Scaffold(
                 .clickable { onClick(manga) }
         ) {
             AsyncImage(
-                model = manga.thumbnailUrl,
+                model = manga,
                 contentDescription = manga.title,
                 modifier = Modifier
                     .fillMaxWidth()

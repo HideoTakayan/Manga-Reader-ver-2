@@ -182,7 +182,8 @@ class ExtensionManager(
             "[ExtensionManager] Tìm thấy ${pluginDirs.size} thư mục JS plugin trong ${jsExtensionsBaseDir.absolutePath}"
         }
 
-        val client: OkHttpClient = Injekt.get()
+        val networkHelper: eu.kanade.tachiyomi.network.NetworkHelper = Injekt.get()
+        val client: OkHttpClient = networkHelper.cloudflareClient
         val result = mutableListOf<Extension.Installed>()
 
         for (dir in pluginDirs) {
@@ -208,7 +209,7 @@ class ExtensionManager(
                 author = info.author,
                 pkgFactory = null,
                 sources = listOf(info.source),
-                icon = null,
+                icon = info.icon,
                 isShared = false,
             )
             result.add(installed)

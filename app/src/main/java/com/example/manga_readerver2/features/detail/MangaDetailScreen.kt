@@ -1,4 +1,4 @@
-﻿@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 package com.example.manga_readerver2.features.detail
 
 import android.content.Intent
@@ -41,6 +41,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.example.manga_readerver2.core.navigation.LocalNavAnimatedVisibilityScope
 import com.example.manga_readerver2.core.navigation.LocalSharedTransitionScope
+import com.example.manga_readerver2.core.utils.HtmlParser
 import com.example.manga_readerver2.domain.model.Chapter
 import com.example.manga_readerver2.domain.model.Manga
 import com.example.manga_readerver2.domain.model.Category
@@ -89,6 +90,8 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
             screenModel.loadMangaDetail(mangaId)
         }
 
+        val isFabExpanded = remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
+
         Scaffold(
             containerColor = BackgroundDark,
             topBar = {
@@ -97,11 +100,26 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                     onBack = { navigator.pop() },
                     onDownloadQueue = { navigator.push(DownloadQueueScreen()) },
                     onRefresh = { screenModel.refreshManual() },
-                // isHttpSource: chĂ¡Â»â€° true khi lÄ‚Â  HTTP source thĂ¡ÂºÂ­t sĂ¡Â»Â± (APK extension)
-                // VBook JS source cĂ…Â©ng cÄ‚Â³ source ID != 0 nÄ‚Âªn khÄ‚Â´ng dÄ‚Â¹ng `source != 0L`
-                isHttpSource = source is eu.kanade.tachiyomi.source.online.HttpSource,
-                isScrolled = isScrolled
+                    isHttpSource = source is eu.kanade.tachiyomi.source.online.HttpSource,
+                    isScrolled = isScrolled,
+                    onDownloadAction = { screenModel.runDownloadAction(it) }
                 )
+            },
+            floatingActionButton = {
+                if (manga != null && chapters.isNotEmpty()) {
+                    val nextToRead = chapters.findLast { !it.read } ?: chapters.firstOrNull()
+                    if (nextToRead != null) {
+                        ExtendedFloatingActionButton(
+                            onClick = { navigator.push(ReaderScreen(manga.id, nextToRead.id)) },
+                            containerColor = PrimaryOrange,
+                            contentColor = Color.White,
+                            expanded = isFabExpanded.value,
+                            icon = { Icon(Icons.Default.PlayArrow, null) },
+                            text = { Text(if (nextToRead.read) "Bắt đầu lại" else "Đọc tiếp", fontWeight = FontWeight.Bold) },
+                            shape = CircleShape
+                        )
+                    }
+                }
             }
         ) { paddingValues ->
             Box(modifier = Modifier.fillMaxSize()) {
@@ -112,7 +130,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                         }
                     }
                     errorMessage != null && manga == null -> {
-                        // HiĂ¡Â»â€¡n lĂ¡Â»â€”i rÄ‚Âµ rÄ‚Â ng thay vÄ‚Â¬ blank screen
+                        // Hiện lỗi rõ ràng thay vì blank screen
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -126,14 +144,14 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                                     modifier = Modifier.size(64.dp)
                                 )
                                 Text(
-                                    text = errorMessage ?: "LĂ¡Â»â€”i khÄ‚Â´ng xÄ‚Â¡c Ă„â€˜Ă¡Â»â€¹nh",
+                                    text = errorMessage ?: "Lỗi không xác định",
                                     color = Color.Gray,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                                 Button(
                                     onClick = { navigator.pop() },
                                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
-                                ) { Text("Quay lĂ¡ÂºÂ¡i") }
+                                ) { Text("Quay lại") }
                             }
                         }
                     }
@@ -144,13 +162,14 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                         manga = manga,
                         sourceName = source?.name ?: "Unknown",
                         chapters = chapters,
+                        downloadStatus = screenModel.downloadStatus.collectAsState().value,
                         isLiked = isLiked,
                         onFavoriteClick = {
                             if (isLiked) {
-                                // Ă„Âang liked Ă¢â€ â€™ mĂ¡Â»Å¸ dialog Ă„â€˜Ă¡Â»Æ’ Ă„â€˜Ă¡Â»â€¢i category hoĂ¡ÂºÂ·c unfavorite
+                                // Đang liked → mở dialog để đổi category hoặc unfavorite
                                 showCategoryDialog = true
                             } else {
-                                // ChĂ†Â°a liked Ă¢â€ â€™ toggle favorite rĂ¡Â»â€œi mĂ¡Â»Å¸ dialog chĂ¡Â»Ân category (chuĂ¡ÂºÂ©n Mihon)
+                                // Chưa liked → toggle favorite rồi mở dialog chọn category (chuẩn Mihon)
                                 screenModel.toggleLike()
                                 showCategoryDialog = true
                             }
@@ -168,7 +187,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mangaUrl))
                                 context.startActivity(intent)
                             } else {
-                                Toast.makeText(context, "NguĂ¡Â»â€œn khÄ‚Â´ng hĂ¡Â»â€” trĂ¡Â»Â£ xem trÄ‚Âªn trÄ‚Â¬nh duyĂ¡Â»â€¡t", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Nguồn không hỗ trợ xem trên trình duyệt", Toast.LENGTH_SHORT).show()
                             }
                         },
                         onShareClick = {
@@ -179,39 +198,18 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                                     type = "text/plain"
                                     putExtra(Intent.EXTRA_TEXT, "${manga.title}\n$mangaUrl")
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Chia sĂ¡ÂºÂ» truyĂ¡Â»â€¡n"))
+                                context.startActivity(Intent.createChooser(intent, "Chia sẻ truyện"))
                             }
                         },
                         onTrackClick = {
-                            Toast.makeText(context, "ChĂ¡Â»Â©c nĂ„Æ’ng theo dÄ‚Âµi sĂ¡ÂºÂ½ sĂ¡Â»â€ºm ra mĂ¡ÂºÂ¯t!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Chức năng theo dõi sẽ sớm ra mắt!", Toast.LENGTH_SHORT).show()
                         },
                         onTagClick = { tag ->
-                            // TODO: ChuyĂ¡Â»Æ’n Ă„â€˜Ă¡ÂºÂ¿n mÄ‚Â n hÄ‚Â¬nh tÄ‚Â¬m kiĂ¡ÂºÂ¿m vĂ¡Â»â€ºi tag
-                            Toast.makeText(context, "TÄ‚Â¬m kiĂ¡ÂºÂ¿m tag: $tag", Toast.LENGTH_SHORT).show()
+                            // TODO: Chuyển đến màn hình tìm kiếm với tag
+                            Toast.makeText(context, "Tìm kiếm tag: $tag", Toast.LENGTH_SHORT).show()
                         }
                     )
-
-                    // Resume Reading FAB
-                    if (chapters.isNotEmpty()) {
-                        val nextToRead = chapters.findLast { !it.read } ?: chapters.firstOrNull()
-                        if (nextToRead != null) {
-                            ExtendedFloatingActionButton(
-                                onClick = { navigator.push(ReaderScreen(manga.id, nextToRead.id)) },
-                                containerColor = PrimaryOrange,
-                                contentColor = Color.White,
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(16.dp)
-                                    .padding(bottom = 16.dp),
-                                shape = CircleShape
-                            ) {
-                                Icon(Icons.Default.PlayArrow, null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (nextToRead.read) "BĂ¡ÂºÂ¯t Ă„â€˜Ă¡ÂºÂ§u lĂ¡ÂºÂ¡i" else "Ă„ÂĂ¡Â»Âc tiĂ¡ÂºÂ¿p", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
+                    } // end manga != null
                 } // end when
 
                 // Dialogs
@@ -271,9 +269,13 @@ fun MangaDetailTopBar(
     onDownloadQueue: () -> Unit,
     onRefresh: () -> Unit,
     isHttpSource: Boolean,
-    isScrolled: Boolean
+    isScrolled: Boolean,
+    onDownloadAction: (DownloadAction) -> Unit
 ) {
-    val backgroundColor = if (isScrolled) Color(0xFF1E1E1E) else Color.Transparent
+    val backgroundColor by androidx.compose.animation.animateColorAsState(if (isScrolled) Color(0xFF1E1E1E) else Color.Transparent, label = "bg")
+    var showDownloadMenu by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+
     Surface(
         color = backgroundColor,
         modifier = Modifier.fillMaxWidth().statusBarsPadding()
@@ -294,12 +296,62 @@ fun MangaDetailTopBar(
                 overflow = TextOverflow.Ellipsis,
                 fontSize = 18.sp
             )
-            IconButton(onClick = onDownloadQueue) {
-                Icon(Icons.Default.Download, "Download Queue", tint = Color.White)
+            
+            Box {
+                IconButton(onClick = { showDownloadMenu = true }) {
+                    Icon(Icons.Default.Download, "Download Options", tint = Color.White)
+                }
+                DropdownMenu(
+                    expanded = showDownloadMenu,
+                    onDismissRequest = { showDownloadMenu = false },
+                    containerColor = Color(0xFF2B2B2B)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Tiếp theo 1 chương", color = Color.White) },
+                        onClick = { showDownloadMenu = false; onDownloadAction(DownloadAction.NEXT_1_CHAPTER) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Tiếp theo 5 chương", color = Color.White) },
+                        onClick = { showDownloadMenu = false; onDownloadAction(DownloadAction.NEXT_5_CHAPTERS) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Tiếp theo 10 chương", color = Color.White) },
+                        onClick = { showDownloadMenu = false; onDownloadAction(DownloadAction.NEXT_10_CHAPTERS) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Chưa đọc", color = Color.White) },
+                        onClick = { showDownloadMenu = false; onDownloadAction(DownloadAction.UNREAD_CHAPTERS) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Tất cả", color = Color.White) },
+                        onClick = { showDownloadMenu = false; onDownloadAction(DownloadAction.ALL_CHAPTERS) }
+                    )
+                }
             }
-            if (isHttpSource) {
-                IconButton(onClick = onRefresh) {
-                    Icon(Icons.Default.Refresh, "Refresh", tint = Color.White)
+
+            Box {
+                IconButton(onClick = { showMoreMenu = true }) {
+                    Icon(Icons.Default.MoreVert, "Thêm", tint = Color.White)
+                }
+                DropdownMenu(
+                    expanded = showMoreMenu,
+                    onDismissRequest = { showMoreMenu = false },
+                    containerColor = Color(0xFF2B2B2B)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Hàng đợi tải xuống", color = Color.White) },
+                        onClick = { showMoreMenu = false; onDownloadQueue() }
+                    )
+                    if (isHttpSource) {
+                        DropdownMenuItem(
+                            text = { Text("Làm mới", color = Color.White) },
+                            onClick = { showMoreMenu = false; onRefresh() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Chia sẻ", color = Color.White) },
+                            onClick = { showMoreMenu = false; /* TODO: Handle share from TopBar, will add later */ }
+                        )
+                    }
                 }
             }
         }
@@ -323,7 +375,8 @@ fun MangaDetailContent(
     onWebViewClick: () -> Unit,
     onShareClick: () -> Unit,
     onTrackClick: () -> Unit,
-    onTagClick: (String) -> Unit
+    onTagClick: (String) -> Unit,
+    downloadStatus: Map<Long, com.example.manga_readerver2.core.download.Download.State>
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
@@ -336,11 +389,11 @@ fun MangaDetailContent(
         item {
             Box(modifier = Modifier.fillMaxWidth().height(340.dp)) {
                 AsyncImage(
-                    model = manga.thumbnailUrl,
+                    model = manga,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize().blur(80.dp),
+                    modifier = Modifier.fillMaxSize().blur(4.dp),
                     contentScale = ContentScale.Crop,
-                    alpha = 0.5f
+                    alpha = 0.2f
                 )
                 Box(
                     modifier = Modifier
@@ -349,7 +402,6 @@ fun MangaDetailContent(
                             Brush.verticalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    BackgroundDark.copy(alpha = 0.5f),
                                     BackgroundDark
                                 )
                             )
@@ -374,7 +426,7 @@ fun MangaDetailContent(
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                             with(sharedTransitionScope) {
                                 AsyncImage(
-                                    model = manga.thumbnailUrl,
+                                    model = manga,
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
@@ -387,7 +439,7 @@ fun MangaDetailContent(
                             }
                         } else {
                             AsyncImage(
-                                model = manga.thumbnailUrl,
+                                model = manga,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
@@ -403,27 +455,25 @@ fun MangaDetailContent(
                         Text(
                             text = manga.title,
                             color = Color.White,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleLarge,
                             maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 28.sp
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = manga.author ?: "Unknown Author",
                                 color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 14.sp
+                                style = MaterialTheme.typography.titleSmall
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         val (statusIcon, statusLabel, statusColor) = when (manga.status) {
-                            1L -> Triple(Icons.Default.Schedule, "Ă„Âang tiĂ¡ÂºÂ¿n hÄ‚Â nh", Color(0xFF4CAF50))
-                            2L -> Triple(Icons.Default.CheckCircle, "Ă„ÂÄ‚Â£ hoÄ‚Â n thÄ‚Â nh", Color(0xFF2196F3))
-                            else -> Triple(Icons.Default.Help, "KhÄ‚Â´ng rÄ‚Âµ", Color.Gray)
+                            1L -> Triple(Icons.Outlined.Schedule, "Đang tiến hành", Color.White.copy(alpha = 0.8f))
+                            2L -> Triple(Icons.Outlined.DoneAll, "Đã hoàn thành", Color.White.copy(alpha = 0.8f))
+                            else -> Triple(Icons.Outlined.Block, "Không rõ", Color.White.copy(alpha = 0.8f))
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(statusIcon, null, tint = statusColor, modifier = Modifier.size(16.dp))
@@ -431,18 +481,15 @@ fun MangaDetailContent(
                             Text(
                                 text = statusLabel,
                                 color = statusColor,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
+                                style = MaterialTheme.typography.bodyMedium
                             )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Public, null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(" • ", color = statusColor, style = MaterialTheme.typography.bodyMedium)
                             Text(
                                 text = sourceName,
-                                color = Color.LightGray,
-                                fontSize = 13.sp
+                                color = statusColor,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -454,39 +501,77 @@ fun MangaDetailContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
+                val defaultColor = Color.White.copy(alpha = 0.6f)
                 MangaActionButton(
-                    icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    label = if (isLiked) "Trong thÆ° viá»‡n" else "ThĂªm vĂ o",
-                    color = if (isLiked) PrimaryOrange else Color.White,
-                    onClick = onFavoriteClick
+                    icon = if (isLiked) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                    label = if (isLiked) "Trong thư viện" else "Thêm vào",
+                    color = if (isLiked) PrimaryOrange else defaultColor,
+                    onClick = onFavoriteClick,
+                    modifier = Modifier.weight(1f)
                 )
-                MangaActionButton(Icons.Default.Public, "WebView", Color.White, onClick = onWebViewClick)
-                MangaActionButton(Icons.Default.TrackChanges, "Tracking", Color.White, onClick = onTrackClick)
-                MangaActionButton(Icons.Default.Share, "Share", Color.White, onClick = onShareClick)
+                MangaActionButton(
+                    icon = Icons.Outlined.HourglassEmpty,
+                    label = "Cập nhật",
+                    color = defaultColor,
+                    onClick = { /* TODO: Edit Fetch Interval */ },
+                    modifier = Modifier.weight(1f)
+                )
+                MangaActionButton(
+                    icon = Icons.Outlined.Sync,
+                    label = "Theo dõi",
+                    color = defaultColor,
+                    onClick = onTrackClick,
+                    modifier = Modifier.weight(1f)
+                )
+                MangaActionButton(
+                    icon = Icons.Outlined.Public,
+                    label = "WebView",
+                    color = defaultColor,
+                    onClick = onWebViewClick,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
         item {
             var isDescriptionExpanded by remember { mutableStateOf(false) }
-            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                Text(
-                    text = manga.description ?: "No description available.",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    maxLines = if (isDescriptionExpanded) Int.MAX_VALUE else 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable { isDescriptionExpanded = !isDescriptionExpanded }
-                )
-                if (!isDescriptionExpanded && (manga.description?.length ?: 0) > 150) {
+            val descriptionText = remember(manga.description) {
+                HtmlParser.extractCleanText(manga.description ?: "No description available.")
+            }
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().animateContentSize().clickable { isDescriptionExpanded = !isDescriptionExpanded }) {
                     Text(
-                        "More",
-                        color = PrimaryOrange,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 4.dp).clickable { isDescriptionExpanded = true }
+                        text = descriptionText,
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = if (isDescriptionExpanded) Int.MAX_VALUE else 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                    
+                    if (!isDescriptionExpanded && descriptionText.length > 100) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, BackgroundDark)
+                                    )
+                                )
+                        )
+                    }
+                }
+                
+                Box(
+                    modifier = Modifier.fillMaxWidth().clickable { isDescriptionExpanded = !isDescriptionExpanded },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isDescriptionExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Toggle Description",
+                        tint = Color.White
                     )
                 }
             }
@@ -494,22 +579,14 @@ fun MangaDetailContent(
 
         item {
             FlowRow(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 manga.genre?.forEach { genre ->
-                    Surface(
-                        color = Color.White.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.padding(vertical = 4.dp).clickable { onTagClick(genre) }
-                    ) {
-                        Text(
-                            text = genre,
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
+                    SuggestionChip(
+                        onClick = { onTagClick(genre) },
+                        label = { Text(text = genre, style = MaterialTheme.typography.bodySmall) }
+                    )
                 }
             }
         }
@@ -524,7 +601,7 @@ fun MangaDetailContent(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "${chapters.size} chÆ°Æ¡ng",
+                    text = "${chapters.size} chương",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp
@@ -540,11 +617,13 @@ fun MangaDetailContent(
         }
 
         items(chapters) { chapter ->
+            val state = downloadStatus[chapter.id] ?: com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
             ChapterItem(
                 chapter = chapter,
                 onRead = { onChapterClick(chapter) },
                 onDownload = { onDownloadChapter(chapter) },
-                isHttpSource = manga.source != 0L
+                isHttpSource = manga.source != 0L,
+                downloadState = state
             )
         }
     }
@@ -555,27 +634,28 @@ fun MangaActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     color: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable { onClick() }
-            .padding(8.dp)
+    TextButton(
+        onClick = onClick,
+        modifier = modifier
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = color,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            color = color.copy(alpha = 0.9f),
-            fontSize = 11.sp,
-            textAlign = TextAlign.Center
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                color = color,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -584,7 +664,8 @@ fun ChapterItem(
     chapter: Chapter,
     onRead: () -> Unit,
     onDownload: () -> Unit,
-    isHttpSource: Boolean
+    isHttpSource: Boolean,
+    downloadState: com.example.manga_readerver2.core.download.Download.State = com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
 ) {
     Surface(
         onClick = onRead,
@@ -597,9 +678,6 @@ fun ChapterItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 val cleanName = com.example.manga_readerver2.core.utils.ChapterRecognition.getDisplayTitle(chapter.name)
-                // NĂ¡ÂºÂ¿u tÄ‚Âªn gĂ¡Â»â€˜c cÄ‚Â³ chĂ¡Â»Â©a cÄ‚Â¡c tĂ¡Â»Â« thÄ‚Âªm (nhĂ†Â° tiÄ‚Âªu Ă„â€˜Ă¡Â»Â phĂ¡Â»Â¥), ta cÄ‚Â³ thĂ¡Â»Æ’ hiĂ¡Â»Æ’n thĂ¡Â»â€¹ thÄ‚Âªm, nhĂ†Â°ng 
-                // tĂ¡ÂºÂ¡m thĂ¡Â»Âi theo Ă„â€˜Ä‚Âºng logic cĂ¡Â»Â§a manga-reader: lĂ¡ÂºÂ¥y tÄ‚Âªn sĂ¡ÂºÂ¡ch
-                // NĂ¡ÂºÂ¿u cleanName quÄ‚Â¡ ngĂ¡ÂºÂ¯n, ta vĂ¡ÂºÂ«n cÄ‚Â³ thĂ¡Â»Æ’ dÄ‚Â¹ng cleanName
                 
                 Text(
                     text = cleanName.ifEmpty { chapter.name },
@@ -609,7 +687,6 @@ fun ChapterItem(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                // HiĂ¡Â»Æ’n thĂ¡Â»â€¹ tÄ‚Âªn gĂ¡Â»â€˜c nhĂ¡Â»Â mĂ¡Â»Â Ă¡Â»Å¸ dĂ†Â°Ă¡Â»â€ºi nĂ¡ÂºÂ¿u nÄ‚Â³ khÄ‚Â¡c vĂ¡Â»â€ºi cleanName
                 if (cleanName != chapter.name && !chapter.name.equals(cleanName, ignoreCase = true)) {
                     Text(
                         text = chapter.name,
@@ -630,18 +707,37 @@ fun ChapterItem(
                 )
             }
 
-            // Download Icon: chĂ¡Â»â€° hiĂ¡Â»â€¡n vĂ¡Â»â€ºi HTTP source thĂ¡ÂºÂ­t sĂ¡Â»Â± (khÄ‚Â´ng hiĂ¡Â»â€¡n cho Local hoĂ¡ÂºÂ·c VBook JS)
             if (isHttpSource) {
                 IconButton(
-                    onClick = onDownload,
+                    onClick = { if (downloadState == com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED) onDownload() },
                     modifier = Modifier.size(32.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.DownloadForOffline,
-                        contentDescription = "Download",
-                        tint = Color.Gray.copy(alpha = 0.8f),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    when (downloadState) {
+                        com.example.manga_readerver2.core.download.Download.State.DOWNLOADED -> {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Đã tải",
+                                tint = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        com.example.manga_readerver2.core.download.Download.State.DOWNLOADING,
+                        com.example.manga_readerver2.core.download.Download.State.QUEUE -> {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = PrimaryOrange,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                        else -> {
+                            Icon(
+                                imageVector = Icons.Outlined.DownloadForOffline,
+                                contentDescription = "Tải xuống",
+                                tint = Color.Gray.copy(alpha = 0.8f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -665,7 +761,7 @@ fun MangaCoverDialog(
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
-                model = manga.thumbnailUrl,
+                model = manga,
                 contentDescription = null,
                 modifier = Modifier.fillMaxWidth().aspectRatio(0.7f),
                 contentScale = ContentScale.Fit
@@ -692,49 +788,49 @@ fun ChapterSettingsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("CÄ‚Â i Ă„â€˜Ă¡ÂºÂ·t chĂ†Â°Ă†Â¡ng", color = Color.White) },
+        title = { Text("Cài đặt chương", color = Color.White) },
         text = {
             Column {
-                Text("SĂ¡ÂºÂ¯p xĂ¡ÂºÂ¿p theo", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
+                Text("Sắp xếp theo", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
                 Row {
                     FilterChip(
                         selected = currentSort == com.example.manga_readerver2.features.detail.ChapterSort.LATEST,
                         onClick = { onSortChange(com.example.manga_readerver2.features.detail.ChapterSort.LATEST) },
-                        label = { Text("MĂ¡Â»â€ºi nhĂ¡ÂºÂ¥t") }
+                        label = { Text("Mới nhất") }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentSort == com.example.manga_readerver2.features.detail.ChapterSort.OLDEST,
                         onClick = { onSortChange(com.example.manga_readerver2.features.detail.ChapterSort.OLDEST) },
-                        label = { Text("CĂ…Â© nhĂ¡ÂºÂ¥t") }
+                        label = { Text("Cũ nhất") }
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("LĂ¡Â»Âc", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
+                Text("Lọc", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
                 Row {
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.ALL,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.ALL) },
-                        label = { Text("TĂ¡ÂºÂ¥t cĂ¡ÂºÂ£") }
+                        label = { Text("Tất cả") }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.UNREAD,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.UNREAD) },
-                        label = { Text("ChĂ†Â°a Ă„â€˜Ă¡Â»Âc") }
+                        label = { Text("Chưa đọc") }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.DOWNLOADED,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.DOWNLOADED) },
-                        label = { Text("Ă„ÂÄ‚Â£ tĂ¡ÂºÂ£i") }
+                        label = { Text("Đã tải") }
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Ă„ÂÄ‚Â³ng", color = PrimaryOrange)
+                Text("Đóng", color = PrimaryOrange)
             }
         },
         containerColor = Color(0xFF2B2B2B),

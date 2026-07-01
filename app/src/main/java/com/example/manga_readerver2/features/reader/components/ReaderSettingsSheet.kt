@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
@@ -40,9 +41,9 @@ fun ReaderSettingsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = if (isTextReader) {
-        listOf("Kiểu đọc", "Hiển thị", "TTS")
+        listOf("Kiểu đọc", "Hiển thị", "TTS", "Vùng chạm")
     } else {
-        listOf("Kiểu đọc", "Chung", "Bộ lọc")
+        listOf("Kiểu đọc", "Chung", "Bộ lọc", "Vùng chạm")
     }
 
     ModalBottomSheet(
@@ -101,6 +102,7 @@ fun ReaderSettingsSheet(
                     0 -> ReadingModeTab(isTextReader, screenModel)
                     1 -> if (isTextReader) TextDisplayTab(screenModel) else GeneralSettingsTab(isTextReader, screenModel)
                     2 -> if (isTextReader) TtsSettingsTab(screenModel) else FilterSettingsTab(screenModel)
+                    3 -> TapZonesTab(screenModel)
                 }
             }
         }
@@ -306,7 +308,6 @@ private fun GeneralSettingsTab(isTextReader: Boolean, screenModel: ReaderScreenM
     val keepScreenOn by screenModel.keepScreenOn.collectAsState()
     val fullscreen by screenModel.fullscreen.collectAsState()
     val incognitoMode by screenModel.incognitoMode.collectAsState()
-    val volumeKeyNavigation by screenModel.volumeKeyNavigation.collectAsState()
     val dualPage by screenModel.dualPage.collectAsState()
     
     Column {
@@ -325,11 +326,6 @@ private fun GeneralSettingsTab(isTextReader: Boolean, screenModel: ReaderScreenM
             label = "Chế độ ẩn danh (Không lưu lịch sử)", 
             checked = incognitoMode, 
             onClick = { screenModel.setIncognitoMode(!incognitoMode) }
-        )
-        CheckboxItem(
-            label = "Chuyển trang bằng phím Âm lượng", 
-            checked = volumeKeyNavigation, 
-            onClick = { screenModel.setVolumeKeyNavigation(!volumeKeyNavigation) }
         )
 
         if (!isTextReader) {
@@ -444,4 +440,69 @@ private fun ColorCircle(color: Color, isSelected: Boolean) {
         color = color,
         border = if (isSelected) BorderStroke(2.dp, PrimaryOrange) else null
     ) {}
+}
+
+
+@Composable
+fun TapZonesTab(screenModel: ReaderScreenModel) {
+    val customTapZones by screenModel.customTapZones.collectAsState()
+    
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Tùy chỉnh vùng chạm", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("Nhấn vào từng ô để thay đổi chức năng. Áp dụng cho cả đọc ngang và cuộn dọc.", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
+
+        // 3x3 Grid
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f) // Square
+                .padding(16.dp)
+                .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                .border(1.dp, GlassBorder, RoundedCornerShape(12.dp))
+        ) {
+            for (row in 0..2) {
+                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    for (col in 0..2) {
+                        val index = row * 3 + col
+                        val action = customTapZones.getOrNull(index) ?: com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.NONE
+                        
+                        var showMenu by remember { mutableStateOf(false) }
+                        
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .border(0.5.dp, GlassBorder)
+                                .clickable { showMenu = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = action.name,
+                                color = if (action == com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.NONE) Color.Gray else PrimaryOrange,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false },
+                                modifier = Modifier.background(CardBackground)
+                            ) {
+                                com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.entries.forEach { tapAction ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(tapAction.label, color = TextPrimary, fontSize = 12.sp) },
+                                        onClick = {
+                                            screenModel.setCustomTapZone(index, tapAction)
+                                            showMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

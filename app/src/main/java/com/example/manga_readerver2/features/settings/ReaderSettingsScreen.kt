@@ -1,4 +1,4 @@
-﻿package com.example.manga_readerver2.features.settings
+package com.example.manga_readerver2.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,6 +18,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.example.manga_readerver2.core.preference.ReaderPreferences
+import com.example.manga_readerver2.core.preference.GeneralPreferences
 import com.example.manga_readerver2.features.reader.ReadingMode
 import com.example.manga_readerver2.ui.theme.BackgroundDark
 import com.example.manga_readerver2.ui.theme.PrimaryOrange
@@ -31,12 +32,13 @@ class ReaderSettingsScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val preferences = remember { Injekt.get<ReaderPreferences>() }
+        val generalPreferences = remember { Injekt.get<GeneralPreferences>() }
 
         Scaffold(
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("CĂ i Ä‘áº·t trĂ¬nh Ä‘á»c", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Cài đặt trình đọc", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -56,56 +58,50 @@ class ReaderSettingsScreen : Screen {
                 
                 PreferenceSwitchItem(
                     title = "Double tap zoom",
-                    subtitle = "PhĂ³ng to khi nháº¥n Ä‘Ăºp",
+                    subtitle = "Phóng to khi nhấn đúp",
                     checked = preferences.doubleTapZoom.get(),
                     onCheckedChange = { preferences.doubleTapZoom.set(it) }
                 )
 
                 PreferenceSwitchItem(
-                    title = "Hiá»ƒn thá»‹ sá»‘ trang",
+                    title = "Hiển thị số trang",
                     checked = preferences.showPageNumber.get(),
                     onCheckedChange = { preferences.showPageNumber.set(it) }
                 )
 
-                PreferenceSwitchItem(
-                    title = "Äiá»u hÆ°á»›ng phĂ­m Ă¢m lÆ°á»£ng",
-                    checked = preferences.volumeKeysNavigation.get(),
-                    onCheckedChange = { preferences.volumeKeysNavigation.set(it) }
-                )
-
-                PreferenceHeader("Truyá»‡n chá»¯ (Novel)")
+                PreferenceHeader("Truyện chữ (Novel)")
                 
                 PreferenceSliderItem(
-                    title = "KĂ­ch thÆ°á»›c chá»¯",
+                    title = "Kích thước chữ",
                     value = preferences.fontSize.get(),
                     range = 12f..32f,
                     onValueChange = { preferences.fontSize.set(it) }
                 )
 
                 PreferenceSliderItem(
-                    title = "Khoáº£ng cĂ¡ch dĂ²ng",
+                    title = "Khoảng cách dòng",
                     value = preferences.lineSpacing.get(),
                     range = 1.0f..2.5f,
                     onValueChange = { preferences.lineSpacing.set(it) }
                 )
 
-                PreferenceHeader("Cháº¿ Ä‘á»™ Ä‘á»c máº·c Ä‘á»‹nh")
+                PreferenceHeader("Chế độ đọc mặc định")
                 
                 ReadingModeSelector(
                     selectedMode = preferences.readingMode.get(),
                     onModeSelected = { preferences.readingMode.set(it) }
                 )
 
-                PreferenceHeader("Báº£o máº­t & Quyá»n riĂªng tÆ°")
+                PreferenceHeader("Bảo mật & Quyền riêng tư")
                 
-                var incognitoMode by remember { mutableStateOf(preferences.incognitoMode.get()) }
+                var incognitoMode by remember { mutableStateOf(generalPreferences.incognitoMode.get()) }
                 PreferenceSwitchItem(
-                    title = "Cháº¿ Ä‘á»™ áº©n danh",
-                    subtitle = "KhĂ´ng lÆ°u lá»‹ch sá»­ vĂ  trang Ä‘ang Ä‘á»c",
+                    title = "Chế độ ẩn danh",
+                    subtitle = "Không lưu lịch sử và trang đang đọc",
                     checked = incognitoMode,
                     onCheckedChange = { 
                         incognitoMode = it
-                        preferences.incognitoMode.set(it) 
+                        generalPreferences.incognitoMode.set(it) 
                     }
                 )
             }
@@ -186,7 +182,7 @@ fun ReadingModeSelector(
     selectedMode: Int,
     onModeSelected: (Int) -> Unit
 ) {
-    val modes = listOf("Dá»c", "Ngang", "Webtoon")
+    val modes = listOf("Dọc", "Ngang", "Webtoon")
     Column(modifier = Modifier.padding(horizontal = 24.dp)) {
         modes.forEachIndexed { index, name ->
             Row(

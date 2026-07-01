@@ -4,18 +4,29 @@ import com.example.manga_readerver2.core.utils.PreferenceStore
 import com.example.manga_readerver2.features.reader.ReadingMode
 
 class ReaderPreferences(preferenceStore: PreferenceStore) {
+    enum class TapAction(val label: String) {
+        PREVIOUS("Lùi / Cuộn Lên"),
+        MENU("Mở Menu"),
+        NEXT("Tiến / Cuộn Xuống"),
+        NONE("Không làm gì")
+    }
+
+    val customTapZones = preferenceStore.getString(
+        "custom_tap_zones",
+        "0,1,2,0,1,2,0,1,2" // Default: Left=PREVIOUS(0), Mid=MENU(1), Right=NEXT(2)
+    )
+
     val readingMode = preferenceStore.getInt("reader_mode", ReadingMode.VERTICAL.ordinal)
     
     // Manga Settings
     val doubleTapZoom = preferenceStore.getBoolean("double_tap_zoom", true)
     val showPageNumber = preferenceStore.getBoolean("show_page_number", true)
     val trueColor = preferenceStore.getBoolean("true_color", false)
-    val volumeKeysNavigation = preferenceStore.getBoolean("volume_keys_navigation", false)
     val readerTapNavigation = preferenceStore.getBoolean("reader_tap_navigation", true)
     val autoScrollSpeed = preferenceStore.getFloat("auto_scroll_speed", 1.0f)
 
     // Text Settings
-    val fontSize = preferenceStore.getFloat("text_font_size", 18f)
+    val fontSize = preferenceStore.getFloat("text_font_size_percent", 100f)
     val lineSpacing = preferenceStore.getFloat("text_line_spacing", 1.5f)
     val textAlign = preferenceStore.getInt("text_align", 0) // 0: Left, 1: Center, 2: Justify
     val theme = preferenceStore.getInt("text_theme", 0) // 0: Dark, 1: White, 2: Sepia
@@ -51,7 +62,6 @@ class ReaderPreferences(preferenceStore: PreferenceStore) {
     val dualPage = preferenceStore.getBoolean("dual_page", false)
     
     // Privacy Settings
-    val incognitoMode = preferenceStore.getBoolean("incognito_mode", false)
     val autoDownloadAmount = preferenceStore.getInt("auto_download_amount", 0)
 
     companion object {

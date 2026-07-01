@@ -57,6 +57,7 @@ dependencies {
     // Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
@@ -123,6 +124,7 @@ dependencies {
 
     // Logcat
     implementation(libs.logcat)
+    implementation(libs.rxjava)
 
     // Serialization
     implementation(libs.sqldelight.android.driver)

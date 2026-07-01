@@ -40,7 +40,7 @@ class ExtensionApi {
             } else {
                 "${repoBaseUrl.removeSuffix("/")}/plugin.json"
             }
-            val pluginResponse = client.newCall(GET(pluginUrl)).execute()
+            val pluginResponse = client.newCall(GET(pluginUrl, headers = okhttp3.Headers.Builder().add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)").build())).execute()
             
             if (pluginResponse.isSuccessful) {
                 val responseString = pluginResponse.body?.string() ?: ""
@@ -48,7 +48,12 @@ class ExtensionApi {
                     json.decodeFromString<VBookExtensionResponse>(responseString).data
                 } catch (e: Exception) {
                     // Fallback to direct list if it's an older format
-                    json.decodeFromString<List<VBookExtensionItemApi>>(responseString)
+                    try {
+                        json.decodeFromString<List<VBookExtensionItemApi>>(responseString)
+                    } catch (e2: Exception) {
+                        logcat(LogPriority.ERROR) { "Failed to parse plugin.json: ${e2.message}\n$responseString" }
+                        emptyList()
+                    }
                 }
                 pluginList.map { vbookExtension ->
                     val slug = vbookExtension.path.substringBeforeLast("/").substringAfterLast("/")
@@ -172,12 +177,12 @@ private data class VBookExtensionItemApi(
     val name: String,
     val author: String? = null,
     val path: String,
-    val version: Int,
-    val source: String,
-    val icon: String,
+    val version: Int = 1,
+    val source: String = "",
+    val icon: String = "",
     val description: String? = null,
-    val type: String,
-    val locale: String
+    val type: String = "",
+    val locale: String = "vi"
 )
 
 @Serializable

@@ -27,8 +27,8 @@ fun PagerViewer(
     cropBorders: Boolean,
     bgColor: Color,
     isAutoScrolling: Boolean = false,
-    autoScrollSpeed: Float = 1f,
-    onTap: (Float, Float, Float) -> Unit,
+    autoScrollSpeed: Float = 1.0f,
+    onTap: ((Float, Float, Float, Float) -> Unit)? = null,
     onLongPress: ((ReaderPage) -> Unit)? = null
 ) {
     val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -40,11 +40,10 @@ fun PagerViewer(
     fun getOriginalIndex(pagerIndex: Int): Int = if (isDualPage) pagerIndex * 2 else pagerIndex
 
     val pagerCount = getPagerCount()
-    val totalPagerCount = pagerCount + 1 // +1 for transition
 
     val pagerState = rememberPagerState(
-        initialPage = getPagerIndex(screenModel.currentPage.value).coerceIn(0, totalPagerCount - 1),
-        pageCount = { totalPagerCount }
+        initialPage = getPagerIndex(screenModel.currentPage.value).coerceIn(0, (pagerCount - 1).coerceAtLeast(0)),
+        pageCount = { pagerCount }
     )
     val scope = rememberCoroutineScope()
 
@@ -54,10 +53,8 @@ fun PagerViewer(
             val delayMs = (3000L / autoScrollSpeed).toLong()
             kotlinx.coroutines.delay(delayMs)
             
-            if (pagerState.currentPage < pagerCount) {
+            if (pagerState.currentPage < pagerCount - 1) {
                 pagerState.animateScrollToPage(pagerState.currentPage + 1)
-            } else {
-                screenModel.loadNextChapter()
             }
         }
     }
@@ -80,8 +77,6 @@ fun PagerViewer(
                 if (getPagerIndex(screenModel.currentPage.value) != pIndex) {
                     screenModel.setPage(originalIndex)
                 }
-            } else {
-                screenModel.loadNextChapter()
             }
         }
     }
@@ -92,9 +87,9 @@ fun PagerViewer(
         VerticalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize().background(bgColor),
-            key = { if (it < pagerCount) it else "transition" }
+            key = { it }
         ) { pIndex ->
-            if (pIndex < pagerCount) {
+            if (pIndex < pages.size) {
                 val pageIndex = getOriginalIndex(pIndex)
                 val page = pages[pageIndex]
                 LaunchedEffect(pageIndex) { 
@@ -102,17 +97,19 @@ fun PagerViewer(
                     if (pageIndex + 1 < pages.size) screenModel.loadPage(pageIndex + 1)
                     if (pageIndex + 2 < pages.size) screenModel.loadPage(pageIndex + 2)
                 }
-                PageImage(
-                    page = page,
-                    screenModel = screenModel,
-                    scaleMode = scaleMode,
-                    isWebtoon = false,
-                    cropBorders = cropBorders,
-                    onTap = onTap,
-                    onLongPress = onLongPress
-                )
-            } else {
-                com.example.manga_readerver2.features.reader.ChapterTransitionPage(screenModel)
+                if (page is ReaderPage.Transition) {
+                    com.example.manga_readerver2.features.reader.ChapterTransitionPage(screenModel, page)
+                } else {
+                    PageImage(
+                        page = page,
+                        screenModel = screenModel,
+                        scaleMode = scaleMode,
+                        isWebtoon = false,
+                        cropBorders = cropBorders,
+                        onTap = onTap,
+                        onLongPress = onLongPress
+                    )
+                }
             }
         }
     } else {
@@ -120,12 +117,12 @@ fun PagerViewer(
             state = pagerState,
             modifier = Modifier.fillMaxSize().background(bgColor),
             reverseLayout = reverseLayout,
-            key = { if (it < pagerCount) it else "transition" }
+            key = { it }
         ) { pIndex ->
             if (pIndex < pagerCount) {
                 val pageIndex1 = getOriginalIndex(pIndex)
                 val page1 = pages[pageIndex1]
-                val page2 = if (isDualPage) pages.getOrNull(pageIndex1 + 1) else null
+                val page2 = if (isDualPage && page1 !is ReaderPage.Transition) pages.getOrNull(pageIndex1 + 1) else null
                 
                 LaunchedEffect(pageIndex1) { 
                     screenModel.loadPage(pageIndex1)
@@ -134,7 +131,9 @@ fun PagerViewer(
                     if (pageIndex1 + 3 < pages.size) screenModel.loadPage(pageIndex1 + 3)
                 }
 
-                if (isDualPage && page2 != null) {
+                if (page1 is ReaderPage.Transition) {
+                    com.example.manga_readerver2.features.reader.ChapterTransitionPage(screenModel, page1)
+                } else if (isDualPage && page2 != null && page2 !is ReaderPage.Transition) {
                     androidx.compose.foundation.layout.Row(
                         modifier = Modifier.fillMaxSize(),
                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
@@ -159,8 +158,6 @@ fun PagerViewer(
                         onLongPress = onLongPress
                     )
                 }
-            } else {
-                com.example.manga_readerver2.features.reader.ChapterTransitionPage(screenModel)
             }
         }
     }

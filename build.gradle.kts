@@ -22,3 +22,14 @@ plugins {
 
 
 
+
+allprojects {
+    tasks.withType<JavaCompile> {
+        options.encoding = "UTF-8"
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            freeCompilerArgs += "-Xencoding=UTF-8"
+        }
+    }
+}

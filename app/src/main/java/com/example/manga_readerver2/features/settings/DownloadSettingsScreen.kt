@@ -37,10 +37,10 @@ class DownloadSettingsScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Táº£i xuá»‘ng", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Tải xuống", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay láº¡i", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -53,7 +53,7 @@ class DownloadSettingsScreen : Screen {
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                SettingsSectionHeader(title = "Máº¡ng")
+                SettingsSectionHeader(title = "Mạng")
                 
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable {
@@ -68,8 +68,8 @@ class DownloadSettingsScreen : Screen {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Chá»‰ táº£i khi dĂ¹ng Wi-Fi", color = Color.White, fontSize = 16.sp)
-                            Text("Táº¡m dá»«ng táº£i khi dĂ¹ng 3G/4G", color = Color.Gray, fontSize = 13.sp)
+                            Text("Chỉ tải khi dùng Wi-Fi", color = Color.White, fontSize = 16.sp)
+                            Text("Tạm dừng tải khi dùng 3G/4G", color = Color.Gray, fontSize = 13.sp)
                         }
                         Switch(
                             checked = wifiOnly,
@@ -85,7 +85,7 @@ class DownloadSettingsScreen : Screen {
                     }
                 }
 
-                SettingsSectionHeader(title = "LÆ°u trá»¯")
+                SettingsSectionHeader(title = "Lưu trữ")
                 
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable {
@@ -100,8 +100,8 @@ class DownloadSettingsScreen : Screen {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Tá»± Ä‘á»™ng xĂ³a sau khi Ä‘á»c", color = Color.White, fontSize = 16.sp)
-                            Text("XĂ³a chÆ°Æ¡ng Ä‘Ă£ táº£i sau khi báº¡n Ä‘á»c Ä‘áº¿n trang cuá»‘i", color = Color.Gray, fontSize = 13.sp)
+                            Text("Tự động xóa sau khi đọc", color = Color.White, fontSize = 16.sp)
+                            Text("Xóa chương đã tải sau khi bạn đọc đến trang cuối", color = Color.Gray, fontSize = 13.sp)
                         }
                         Switch(
                             checked = autoDelete,

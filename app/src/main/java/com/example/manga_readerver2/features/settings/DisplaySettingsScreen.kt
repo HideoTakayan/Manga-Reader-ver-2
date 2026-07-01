@@ -36,11 +36,11 @@ class DisplaySettingsScreen : Screen {
         var appTheme by remember { mutableStateOf(displayPreferences.appTheme.get()) }
 
         val themeOptions = mapOf(
-            "DEFAULT" to "Cam (Máº·c Ä‘á»‹nh)",
-            "GREEN_APPLE" to "TĂ¡o xanh",
-            "LAVENDER" to "Hoa oáº£i hÆ°Æ¡ng",
-            "STRAWBERRY" to "DĂ¢u tĂ¢y",
-            "MIDNIGHT_DUSK" to "Cháº¡ng váº¡ng"
+            "DEFAULT" to "Cam (Mặc định)",
+            "GREEN_APPLE" to "Táo xanh",
+            "LAVENDER" to "Hoa oải hương",
+            "STRAWBERRY" to "Dâu tây",
+            "MIDNIGHT_DUSK" to "Chạng vạng"
         )
         var expanded by remember { mutableStateOf(false) }
 
@@ -48,10 +48,10 @@ class DisplaySettingsScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Hiá»ƒn thá»‹", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Hiển thị", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay láº¡i", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -64,7 +64,7 @@ class DisplaySettingsScreen : Screen {
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                SettingsSectionHeader(title = "Chá»§ Ä‘á» (Theme)")
+                SettingsSectionHeader(title = "Chủ đề (Theme)")
 
                 // Theme Dropdown
                 Surface(
@@ -74,8 +74,8 @@ class DisplaySettingsScreen : Screen {
                     Column(
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                     ) {
-                        Text("MĂ u chá»§ Ä‘áº¡o (App Theme)", color = Color.White, fontSize = 16.sp)
-                        Text("Chá»n mĂ u sáº¯c giao diá»‡n yĂªu thĂ­ch", color = Color.Gray, fontSize = 13.sp)
+                        Text("Màu chủ đạo (App Theme)", color = Color.White, fontSize = 16.sp)
+                        Text("Chọn màu sắc giao diện yêu thích", color = Color.Gray, fontSize = 13.sp)
 
                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -84,7 +84,7 @@ class DisplaySettingsScreen : Screen {
                             onExpandedChange = { expanded = !expanded }
                         ) {
                             OutlinedTextField(
-                                value = themeOptions[appTheme] ?: "Cam (Máº·c Ä‘á»‹nh)",
+                                value = themeOptions[appTheme] ?: "Cam (Mặc định)",
                                 onValueChange = {},
                                 readOnly = true,
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -130,12 +130,12 @@ class DisplaySettingsScreen : Screen {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "MĂ u Ä‘á»™ng (Material You)", 
+                                "Màu động (Material You)", 
                                 color = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Color.White else Color.DarkGray, 
                                 fontSize = 16.sp
                             )
                             Text(
-                                "Äá»“ng bá»™ mĂ u sáº¯c vá»›i hĂ¬nh ná»n (Cáº§n Android 12+)", 
+                                "Đồng bộ màu sắc với hình nền (Cần Android 12+)", 
                                 color = Color.Gray, 
                                 fontSize = 13.sp
                             )
@@ -168,8 +168,8 @@ class DisplaySettingsScreen : Screen {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Cháº¿ Ä‘á»™ Äen tuyá»n (Pure Black)", color = Color.White, fontSize = 16.sp)
-                            Text("Tiáº¿t kiá»‡m pin cho mĂ n hĂ¬nh OLED/AMOLED", color = Color.Gray, fontSize = 13.sp)
+                            Text("Chế độ Đen tuyền (Pure Black)", color = Color.White, fontSize = 16.sp)
+                            Text("Tiết kiệm pin cho màn hình OLED/AMOLED", color = Color.Gray, fontSize = 13.sp)
                         }
                         Switch(
                             checked = pureBlack,

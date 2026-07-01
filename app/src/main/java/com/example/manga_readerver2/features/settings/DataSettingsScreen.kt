@@ -1,4 +1,4 @@
-﻿package com.example.manga_readerver2.features.settings
+package com.example.manga_readerver2.features.settings
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,13 +50,13 @@ class DataSettingsScreen : Screen {
         val autoClear by generalPreferences.autoClearCache.asFlow().collectAsState(initial = generalPreferences.autoClearCache.get())
         val maxSize by generalPreferences.maxCacheSize.asFlow().collectAsState(initial = generalPreferences.maxCacheSize.get())
 
-        // Hiá»ƒn thá»‹ dialog preview trÆ°á»›c khi restore
+        // Hiển thị dialog preview trước khi restore
         backupPreview?.let { preview ->
             AlertDialog(
                 onDismissRequest = { screenModel.dismissBackupPreview() },
                 title = {
                     Text(
-                        if (preview.isValid) "XĂ¡c nháº­n khĂ´i phá»¥c" else "File backup lá»—i",
+                        if (preview.isValid) "Xác nhận khôi phục" else "File backup lỗi",
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
@@ -64,20 +64,20 @@ class DataSettingsScreen : Screen {
                 text = {
                     if (preview.isValid) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("ThĂ´ng tin file backup:", color = Color.White, fontWeight = FontWeight.SemiBold)
-                            Text("â€¢ ${preview.mangaCount} truyá»‡n", color = Color.Gray)
-                            Text("â€¢ ${preview.chapterCount} chÆ°Æ¡ng", color = Color.Gray)
-                            Text("â€¢ ${preview.categoryCount} danh má»¥c", color = Color.Gray)
+                            Text("Thông tin file backup:", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text("• ${preview.mangaCount} truyện", color = Color.Gray)
+                            Text("• ${preview.chapterCount} chương", color = Color.Gray)
+                            Text("• ${preview.categoryCount} danh mục", color = Color.Gray)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                "Dá»¯ liá»‡u hiá»‡n táº¡i sáº½ Ä‘Æ°á»£c giá»¯ nguyĂªn, truyá»‡n má»›i tá»« backup sáº½ Ä‘Æ°á»£c thĂªm vĂ o.",
+                                "Dữ liệu hiện tại sẽ được giữ nguyên, truyện mới từ backup sẽ được thêm vào.",
                                 color = Color.Gray,
                                 fontSize = 12.sp
                             )
                         }
                     } else {
                         Text(
-                            preview.errorMessage ?: "File backup khĂ´ng há»£p lá»‡",
+                            preview.errorMessage ?: "File backup không hợp lệ",
                             color = Color(0xFFFF6B6B)
                         )
                     }
@@ -85,13 +85,13 @@ class DataSettingsScreen : Screen {
                 confirmButton = {
                     if (preview.isValid) {
                         TextButton(onClick = { screenModel.confirmRestoreBackup() }) {
-                            Text("KhĂ´i phá»¥c", color = PrimaryOrange)
+                            Text("Khôi phục", color = PrimaryOrange)
                         }
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { screenModel.dismissBackupPreview() }) {
-                        Text("Há»§y", color = Color.Gray)
+                        Text("Hủy", color = Color.Gray)
                     }
                 },
                 containerColor = Color(0xFF2B2B2B)
@@ -127,10 +127,10 @@ class DataSettingsScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Dá»¯ liá»‡u vĂ  Sao lÆ°u", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Dữ liệu và Sao lưu", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay láº¡i", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -143,12 +143,12 @@ class DataSettingsScreen : Screen {
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                SettingsSectionHeader(title = "Sao lÆ°u")
+                SettingsSectionHeader(title = "Sao lưu")
 
                 SettingsPreferenceItem(
                     icon = Icons.Default.Backup,
-                    title = "Táº¡o báº£n sao lÆ°u",
-                    subtitle = "CĂ³ thá»ƒ dĂ¹ng Ä‘á»ƒ khĂ´i phá»¥c thÆ° viá»‡n á»Ÿ cĂ¡c thiáº¿t bá»‹ khĂ¡c",
+                    title = "Tạo bản sao lưu",
+                    subtitle = "Có thể dùng để khôi phục thư viện ở các thiết bị khác",
                     onClick = {
                         val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault())
                         val fileName = "manga_reader_backup_${dateFormat.format(Date())}.json.gz"
@@ -158,8 +158,8 @@ class DataSettingsScreen : Screen {
 
                 SettingsPreferenceItem(
                     icon = Icons.Default.Restore,
-                    title = "KhĂ´i phá»¥c báº£n sao lÆ°u",
-                    subtitle = "KhĂ´i phá»¥c thÆ° viá»‡n tá»« file sao lÆ°u Ä‘Ă£ táº¡o",
+                    title = "Khôi phục bản sao lưu",
+                    subtitle = "Khôi phục thư viện từ file sao lưu đã tạo",
                     onClick = {
                         restoreBackupLauncher.launch(arrayOf("application/gzip", "application/octet-stream"))
                     }
@@ -170,17 +170,17 @@ class DataSettingsScreen : Screen {
                 val maxAutoBackups by screenModel.maxAutoBackups.collectAsState(initial = 5)
 
                 SettingsSwitchItem(
-                    title = "Tá»± Ä‘á»™ng sao lÆ°u",
-                    subtitle = "Sao lÆ°u Ä‘á»‹nh ká»³ thÆ° viá»‡n á»Ÿ cháº¿ Ä‘á»™ ná»n",
+                    title = "Tự động sao lưu",
+                    subtitle = "Sao lưu định kỳ thư viện ở chế độ nền",
                     checked = autoBackup,
                     onCheckedChange = { screenModel.setAutoBackup(it) }
                 )
 
                 if (autoBackup) {
                     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-                        Text("Táº§n suáº¥t sao lÆ°u", color = Color.White, fontSize = 14.sp)
+                        Text("Tần suất sao lưu", color = Color.White, fontSize = 14.sp)
                         val frequencyOptions = listOf(12, 24, 48, 168)
-                        val frequencyLabels = listOf("Má»—i 12 giá»", "Má»—i ngĂ y", "Má»—i 2 ngĂ y", "Má»—i tuáº§n")
+                        val frequencyLabels = listOf("Mỗi 12 giờ", "Mỗi ngày", "Mỗi 2 ngày", "Mỗi tuần")
                         val selectedIndex = frequencyOptions.indexOf(autoBackupFrequency).takeIf { it >= 0 } ?: 1
                         
                         Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -198,7 +198,7 @@ class DataSettingsScreen : Screen {
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Text("Giá»›i háº¡n sá»‘ báº£n sao lÆ°u: $maxAutoBackups", color = Color.White, fontSize = 14.sp)
+                        Text("Giới hạn số bản sao lưu: $maxAutoBackups", color = Color.White, fontSize = 14.sp)
                         Slider(
                             value = maxAutoBackups.toFloat(),
                             onValueChange = { screenModel.setMaxAutoBackups(it.toInt()) },
@@ -211,7 +211,7 @@ class DataSettingsScreen : Screen {
                         )
                         
                         Text(
-                            "File Ä‘Æ°á»£c lÆ°u táº¡i: ThÆ° má»¥c Data cá»§a á»©ng dá»¥ng /files/backups/",
+                            "File được lưu tại: /sdcard/MangaReader/backups/",
                             color = Color.Gray,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 8.dp)
@@ -221,21 +221,21 @@ class DataSettingsScreen : Screen {
 
                 HorizontalDivider(color = Color.DarkGray, modifier = Modifier.padding(vertical = 8.dp))
 
-                SettingsSectionHeader(title = "Bá»™ nhá»›")
+                SettingsSectionHeader(title = "Bộ nhớ")
 
                 SettingsPreferenceItem(
                     icon = Icons.Default.Cached,
-                    title = "XĂ³a bá»™ nhá»› Ä‘á»‡m hĂ¬nh áº£nh",
-                    subtitle = "Sá»­ dá»¥ng: $cacheSize",
+                    title = "Xóa bộ nhớ đệm hình ảnh",
+                    subtitle = "Sử dụng: $cacheSize",
                     onClick = {
                         screenModel.clearCache()
-                        Toast.makeText(context, "ÄĂ£ xĂ³a bá»™ nhá»› Ä‘á»‡m", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Đã xóa bộ nhớ đệm", Toast.LENGTH_SHORT).show()
                     }
                 )
 
                 SettingsSwitchItem(
-                    title = "Tá»± Ä‘á»™ng dá»n dáº¹p bá»™ nhá»› Ä‘á»‡m",
-                    subtitle = "Tá»± Ä‘á»™ng xĂ³a khi vÆ°á»£t quĂ¡ giá»›i háº¡n",
+                    title = "Tự động dọn dẹp bộ nhớ đệm",
+                    subtitle = "Tự động xóa khi vượt quá giới hạn",
                     checked = autoClear,
                     onCheckedChange = { 
                         generalPreferences.autoClearCache.set(it)
@@ -245,7 +245,7 @@ class DataSettingsScreen : Screen {
 
                 if (autoClear) {
                     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-                        Text("Giá»›i háº¡n bá»™ nhá»›: ${maxSize} MB", color = Color.White, fontSize = 14.sp)
+                        Text("Giới hạn bộ nhớ: ${maxSize} MB", color = Color.White, fontSize = 14.sp)
                         Slider(
                             value = maxSize.toFloat(),
                             onValueChange = { generalPreferences.maxCacheSize.set(it.toInt()) },

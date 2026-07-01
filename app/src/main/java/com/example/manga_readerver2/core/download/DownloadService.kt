@@ -158,6 +158,31 @@ class DownloadService : Service() {
         download.pages = pages
         download.progress = 0
 
+        // Download cover image if not exists
+        try {
+            val mangaDir = fileManager.getDownloadPath().resolve(download.source.name).resolve(download.manga.title + "_" + download.manga.id)
+            if (!mangaDir.exists()) mangaDir.mkdirs()
+            val coverFile = File(mangaDir, "cover.jpg")
+            
+            if (!coverFile.exists() && !download.manga.thumbnailUrl.isNullOrEmpty()) {
+                val imageUrl = download.manga.thumbnailUrl!!
+                val httpSource = source as? HttpSource
+                val requestHeaders = httpSource?.headers ?: okhttp3.Headers.Builder()
+                    .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .build()
+                val request = okhttp3.Request.Builder().url(imageUrl).headers(requestHeaders).build()
+                okHttpClient.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        response.body?.let { body ->
+                            FileOutputStream(coverFile).use { out -> body.byteStream().copyTo(out) }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace() // Lỗi cover không quan trọng, bỏ qua
+        }
+
         if (download.isNovel) {
             // Tải TRUYỆN CHỮ
             val paragraphs = mutableListOf<String>()

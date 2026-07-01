@@ -64,6 +64,11 @@ UPDATE manga SET
     initialized = ?
 WHERE _id = ?;
 
+updateMangaThumbnail:
+UPDATE manga SET
+    thumbnail_url = ?
+WHERE _id = ? AND (thumbnail_url IS NULL OR thumbnail_url = '');
+
 updateMangaFavorite:
 UPDATE manga SET
     favorite = ?

@@ -16,6 +16,7 @@ SELECT
     h.last_read AS lRead,
     h.time_read AS tRead,
     m.thumbnail_url AS tUrl,
+    m.source AS mSource,
     m._id AS mId,
     c._id AS cId
 FROM history h

@@ -1,4 +1,4 @@
-﻿package com.example.manga_readerver2.features.browse
+package com.example.manga_readerver2.features.browse
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -57,22 +57,20 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
         val sheetState = rememberModalBottomSheetState()
 
         LaunchedEffect(sourceId) {
-            screenModel.initSource(sourceId)
             if (latest) {
                 screenModel.setListing(CatalogueScreenModel.Listing.Latest)
             } else if (!initialQuery.isNullOrEmpty()) {
                 screenModel.search(initialQuery)
             }
+            screenModel.initSource(sourceId)
         }
 
-        // Táº¡o luá»“ng dá»¯ liá»‡u má»›i má»—i khi state thay Ä‘á»•i
+        // Tạo luồng dữ liệu mới mỗi khi state thay đổi
         val listing by screenModel.listing.collectAsState()
         val query by screenModel.searchQuery.collectAsState()
         val filters by screenModel.filters.collectAsState()
         
-        val pagingData = remember(listing, query, filters) {
-            screenModel.getMangaFlow()
-        }.collectAsLazyPagingItems()
+        val pagingData = screenModel.mangaFlow.collectAsLazyPagingItems()
 
         Scaffold(
             containerColor = BackgroundDark,
@@ -83,7 +81,7 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("TĂ¬m kiáº¿m...") },
+                                placeholder = { Text("Tìm kiếm...") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 keyboardActions = KeyboardActions(onSearch = { screenModel.search(searchQuery) }),
@@ -133,17 +131,17 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
             }
         ) { paddingValues ->
             Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                // Thanh Chips: Phá»• biáº¿n / Má»›i nháº¥t
+                // Thanh Chips: Phổ biến / Mới nhất
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = listing == CatalogueScreenModel.Listing.Popular,
                         onClick = { screenModel.setListing(CatalogueScreenModel.Listing.Popular) },
-                        label = { Text("Phá»• biáº¿n") }
+                        label = { Text("Phổ biến") }
                     )
                     FilterChip(
                         selected = listing == CatalogueScreenModel.Listing.Latest,
                         onClick = { screenModel.setListing(CatalogueScreenModel.Listing.Latest) },
-                        label = { Text("Má»›i cáº­p nháº­t") }
+                        label = { Text("Mới cập nhật") }
                     )
                 }
 
@@ -168,7 +166,7 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                                         ) {
                                             AsyncImage(
-                                                model = manga.thumbnailUrl,
+                                                model = manga,
                                                 contentDescription = manga.title,
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
@@ -232,14 +230,14 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Bá»™ lá»c", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Bộ lọc", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Row {
-                    TextButton(onClick = onReset) { Text("Äáº·t láº¡i", color = PrimaryOrange) }
+                    TextButton(onClick = onReset) { Text("Đặt lại", color = PrimaryOrange) }
                     Button(
                         onClick = onFilter,
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
                     ) {
-                        Text("Lá»c")
+                        Text("Lọc")
                     }
                 }
             }
@@ -322,8 +320,8 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                 var state by remember { mutableStateOf(filter.state) }
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(filter.name, color = Color.Gray, fontSize = 12.sp)
-                    // á» Ä‘Ă¢y cĂ³ thá»ƒ dĂ¹ng ExposedDropdownMenu hoáº·c Ä‘Æ¡n giáº£n lĂ  má»™t Row cuá»™n ngang
-                    // Äá»ƒ Ä‘Æ¡n giáº£n tĂ´i sáº½ dĂ¹ng má»™t Row cĂ¡c FilterChips
+                    // Ở đây có thể dùng ExposedDropdownMenu hoặc đơn giản là một Row cuộn ngang
+                    // Để đơn giản tôi sẽ dùng một Row các FilterChips
                     Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         filter.values.forEachIndexed { index, value ->
                             FilterChip(

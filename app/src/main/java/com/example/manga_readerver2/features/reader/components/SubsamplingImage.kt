@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.PointF
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,11 +22,10 @@ import com.davemorrissey.labs.subscaleview.ImageSource
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import logcat.LogPriority
-import logcat.logcat
 import java.io.File
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import kotlin.math.abs
 
 @Composable
 fun SubsamplingImage(
@@ -33,7 +33,7 @@ fun SubsamplingImage(
     modifier: Modifier = Modifier,
     scaleMode: Int = 0, // 0: Fit Screen, 1: Fit Width, 2: Fit Height
     isWebtoon: Boolean = false,
-    onTap: ((x: Float, y: Float, width: Float) -> Unit)? = null,
+    onTap: ((x: Float, y: Float, width: Float, height: Float) -> Unit)? = null,
     onLongPress: (() -> Unit)? = null
 ) {
     val currentOnTap = rememberUpdatedState(onTap)
@@ -68,42 +68,33 @@ fun SubsamplingImage(
 
     val lastSource = remember { mutableStateOf<ImageSource?>(null) }
     
-    if (imageSource != null || isWebtoon) {
+    if (imageSource != null) {
         Box(modifier = modifier) {
-            if (isWebtoon) {
-                // Webtoon mode uses standard Coil AsyncImage for smooth continuous scrolling
-                AsyncImage(
-                    model = model,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onLongPress = { currentOnLongPress.value?.invoke() },
-                                onTap = { offset ->
-                                    currentOnTap.value?.invoke(offset.x, offset.y, size.width.toFloat())
-                                }
-                            )
-                        },
-                    contentScale = ContentScale.FillWidth
-                )
-            } else {
-                // Single-page mode: SubsamplingScaleImageView with proper gesture handling
-                AndroidView(
-                    factory = { ctx ->
-                        createSubsamplingView(ctx, contentScale, currentOnTap, currentOnLongPress)
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    update = { view ->
-                        view.setMinimumScaleType(contentScale)
-                        if (lastSource.value != imageSource) {
-                            view.setImage(imageSource!!)
-                            lastSource.value = imageSource
+            // Use SubsamplingScaleImageView for ALL modes, including Webtoon
+            AndroidView(
+                factory = { ctx ->
+                    createSubsamplingView(ctx, contentScale, currentOnTap, currentOnLongPress).apply {
+                        if (isWebtoon) {
+                            // In Webtoon mode, disable panning and zooming on the image itself.
+                            // The parent LazyColumn and transformableState will handle scrolling and zooming.
+                            setPanEnabled(false)
+                            setZoomEnabled(false)
                         }
                     }
-                )
-            }
+                },
+                modifier = Modifier.fillMaxSize(),
+                update = { view ->
+                    if (isWebtoon) {
+                        view.setMinimumScaleType(SubsamplingScaleImageView.SCALE_TYPE_CENTER_CROP)
+                    } else {
+                        view.setMinimumScaleType(contentScale)
+                    }
+                    if (lastSource.value != imageSource) {
+                        view.setImage(imageSource!!)
+                        lastSource.value = imageSource
+                    }
+                }
+            )
         }
     } else {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -112,30 +103,64 @@ fun SubsamplingImage(
     }
 }
 
-/**
- * Tạo SubsamplingScaleImageView với gesture handling đúng:
- * - Single tap → toggle controls (invoke onTap)
- * - Double tap → zoom in/out
- * - Pinch → zoom
- * - Khi đang zoom (scale > minScale): consume touch event (return true) để LazyColumn không can thiệp
- * - Khi ở minScale: return false cho phép parent scroll (nhưng chế độ single-page không cần scroll)
- */
 private class ComposeSubsamplingImageView(context: Context) : SubsamplingScaleImageView(context) {
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val result = super.onTouchEvent(event)
+        val handled = super.onTouchEvent(event)
+        
         val isZoomed = scale > minScale * 1.05f
-        if (!isZoomed && event.action == MotionEvent.ACTION_MOVE) {
-            // Undo any disallow intercept requests made by super.onTouchEvent so Compose Pager can intercept
+        if (!isZoomed) {
             parent?.requestDisallowInterceptTouchEvent(false)
+        } else if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+            // Khi ảnh đã zoom và kéo đến rìa, ta cần cho phép Pager intercept thao tác
+            // Nếu không thể scroll thêm theo hướng ngang hoặc dọc, trả lại touch event cho Compose
+            if (!canScrollHorizontally(-1) || !canScrollHorizontally(1) || !canScrollVertically(-1) || !canScrollVertically(1)) {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
         }
-        return result
+        
+        return handled
+    }
+
+    override fun canScrollHorizontally(direction: Int): Boolean {
+        if (!isReady) return false
+        val isZoomed = scale > minScale * 1.05f
+        if (!isZoomed) return false
+        
+        val currentCenter = this.center ?: return false
+        val sourceLeft = currentCenter.x - (width / 2f) / scale
+        val sourceRight = currentCenter.x + (width / 2f) / scale
+        val margin = 2f // Bù sai số làm tròn pixel
+        
+        return if (direction < 0) { // Cuộn sang trái (vuốt sang phải)
+            sourceLeft > margin
+        } else { // Cuộn sang phải (vuốt sang trái)
+            sourceRight < sWidth.toFloat() - margin
+        }
+    }
+
+    override fun canScrollVertically(direction: Int): Boolean {
+        if (!isReady) return false
+        val isZoomed = scale > minScale * 1.05f
+        if (!isZoomed) return false
+        
+        val currentCenter = this.center ?: return false
+        val sourceTop = currentCenter.y - (height / 2f) / scale
+        val sourceBottom = currentCenter.y + (height / 2f) / scale
+        val margin = 2f
+        
+        return if (direction < 0) { // Cuộn lên trên (vuốt xuống)
+            sourceTop > margin
+        } else { // Cuộn xuống dưới (vuốt lên)
+            sourceBottom < sHeight.toFloat() - margin
+        }
     }
 }
 
 private fun createSubsamplingView(
     ctx: Context,
     contentScale: Int,
-    currentOnTap: State<((Float, Float, Float) -> Unit)?>,
+    currentOnTap: State<((Float, Float, Float, Float) -> Unit)?>,
     currentOnLongPress: State<(() -> Unit)?>
 ): SubsamplingScaleImageView {
     return ComposeSubsamplingImageView(ctx).apply {
@@ -147,68 +172,27 @@ private fun createSubsamplingView(
 
         val tapDetector = GestureDetector(ctx, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                currentOnTap.value?.invoke(e.x, e.y, width.toFloat())
+                currentOnTap.value?.invoke(e.x, e.y, width.toFloat(), height.toFloat())
                 return true
             }
-            
+
             override fun onLongPress(e: MotionEvent) {
                 currentOnLongPress.value?.invoke()
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
-                val currentScale = scale
-                val mScale = minScale
-                if (currentScale > mScale * 1.1f) {
-                    // Zoom về minScale
-                    animateScaleAndCenter(mScale, center)?.withDuration(250)?.start()
-                } else {
-                    // Zoom vào 2x
-                    val targetScale = minOf(maxScale, mScale * 2.5f)
-                    animateScaleAndCenter(targetScale, PointF(e.x, e.y))?.withDuration(250)?.start()
+                if (isReady) {
+                    val targetScale = if (scale > minScale * 1.1f) minScale else maxScale
+                    animateScaleAndCenter(targetScale, PointF(e.x, e.y))?.withDuration(300)?.start()
+                    return true
                 }
-                return true
+                return false
             }
         })
 
-        var initialX = 0f
-        var initialY = 0f
-        var isZoomed = false
-
-        setOnTouchListener { v, event ->
+        setOnTouchListener { _, event ->
             tapDetector.onTouchEvent(event)
-
-            val currentScale = scale
-            val mScale = minScale
-            isZoomed = currentScale > mScale * 1.05f
-
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = event.x
-                    initialY = event.y
-                    // Chỉ block parent nếu đang zoom
-                    v.parent?.requestDisallowInterceptTouchEvent(isZoomed)
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (!isZoomed) {
-                        // Không zoom: nhường hết gesture cho Pager (trái/phải/dọc)
-                        v.parent?.requestDisallowInterceptTouchEvent(false)
-                    } else {
-                        // Đang zoom: kiểm tra xem có thể pan không
-                        val dx = event.x - initialX
-                        val dy = event.y - initialY
-                        val canPanX = if (dx > 0) v.canScrollHorizontally(-1) else v.canScrollHorizontally(1)
-                        val canPanY = if (dy > 0) v.canScrollVertically(-1) else v.canScrollVertically(1)
-                        val isHorizontalDrag = kotlin.math.abs(dx) > kotlin.math.abs(dy)
-                        val canPan = if (isHorizontalDrag) canPanX else canPanY
-                        v.parent?.requestDisallowInterceptTouchEvent(canPan)
-                    }
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                }
-            }
-            
-            // Trả về false để nhường quyền xử lý pan/zoom cho SubsamplingScaleImageView
+            // Tra ve false de nhuong quyen xu ly pan/zoom cho SubsamplingScaleImageView
             false
         }
     }

@@ -1,43 +1,62 @@
 package com.example.manga_readerver2.core.utils
 
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import java.io.File
+
 class FileManager(private val context: Context) {
 
-    private val rootFolderName = "MangaReader"
-    
+    companion object {
+        const val ROOT_FOLDER_NAME = "MangaReader"
+    }
+
+    /**
+     * Thư mục gốc: /sdcard/MangaReader/
+     * Giống với cách Mihon lưu tại /sdcard/Mihon/
+     * Yêu cầu MANAGE_EXTERNAL_STORAGE trên Android 11+.
+     */
     fun getRootPath(): File {
-        // Sử dụng app-specific external storage (Android/data/com.example.manga_readerver2/files)
-        // Cách này không cần xin quyền READ/WRITE trên Android 11-14 và cực kỳ ổn định.
-        val dir = File(context.getExternalFilesDir(null), rootFolderName)
+        val storageDir = Environment.getExternalStorageDirectory()
+        val dir = File(storageDir, ROOT_FOLDER_NAME)
         if (!dir.exists()) dir.mkdirs()
         return dir
     }
 
+    /**
+     * Thư mục tải xuống: /sdcard/MangaReader/downloads/
+     */
     fun getDownloadPath(): File {
         val dir = File(getRootPath(), "downloads")
         if (!dir.exists()) {
             dir.mkdirs()
-            // Add .nomedia to hide from gallery
+            // Ẩn khỏi Gallery
             File(dir, ".nomedia").createNewFile()
         }
         return dir
     }
 
+    /**
+     * Thư mục truyện local: /sdcard/MangaReader/local/
+     */
     fun getLocalSourcePath(): File {
         val dir = File(getRootPath(), "local")
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    /**
+     * Thư mục backup: /sdcard/MangaReader/backups/
+     */
+    fun getBackupPath(): File {
+        val dir = File(getRootPath(), "backups")
+        if (!dir.exists()) dir.mkdirs()
         return dir
     }
 
     fun getMangaPath(sourceName: String, mangaTitle: String, mangaId: String): File {
         val sourceDir = File(getDownloadPath(), sanitizeFileName(sourceName))
         if (!sourceDir.exists()) sourceDir.mkdirs()
-        
-        // Sử dụng title và ID để đảm bảo tính duy nhất
         val uniqueName = "${sanitizeFileName(mangaTitle)}_${mangaId.takeLast(6)}"
         val dir = File(sourceDir, uniqueName)
         if (!dir.exists()) dir.mkdirs()
@@ -50,17 +69,11 @@ class FileManager(private val context: Context) {
         return dir
     }
 
-    /**
-     * Đường dẫn file .cbz cho truyện tranh (Manga).
-     */
     fun getChapterCbzPath(sourceName: String, mangaTitle: String, mangaId: String, chapterTitle: String): File {
         val mangaDir = getMangaPath(sourceName, mangaTitle, mangaId)
         return File(mangaDir, "${sanitizeFileName(chapterTitle)}.cbz")
     }
 
-    /**
-     * Đường dẫn file .epub cho truyện chữ (Novel).
-     */
     fun getChapterNovelPath(sourceName: String, mangaTitle: String, mangaId: String, chapterTitle: String): File {
         val mangaDir = getMangaPath(sourceName, mangaTitle, mangaId)
         return File(mangaDir, "${sanitizeFileName(chapterTitle)}.epub")
@@ -77,10 +90,8 @@ class FileManager(private val context: Context) {
     fun deleteChapter(sourceName: String, mangaTitle: String, mangaId: String, chapterTitle: String) {
         val cbz = getChapterCbzPath(sourceName, mangaTitle, mangaId, chapterTitle)
         if (cbz.exists()) cbz.delete()
-        
         val epub = getChapterNovelPath(sourceName, mangaTitle, mangaId, chapterTitle)
         if (epub.exists()) epub.delete()
-        
         val dir = getChapterPath(sourceName, mangaTitle, mangaId, chapterTitle)
         if (dir.exists()) dir.deleteRecursively()
     }
@@ -98,6 +109,20 @@ class FileManager(private val context: Context) {
             bytes >= mb -> String.format(java.util.Locale.US, "%.1f MB", bytes.toDouble() / mb)
             bytes >= kb -> String.format(java.util.Locale.US, "%.1f KB", bytes.toDouble() / kb)
             else -> "$bytes B"
+        }
+    }
+
+    /**
+     * Kiểm tra xem app có quyền truy cập toàn bộ storage không.
+     * Trên Android 11+: cần MANAGE_EXTERNAL_STORAGE
+     * Trên Android 10 trở xuống: READ_EXTERNAL_STORAGE là đủ
+     */
+    fun hasStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            val permission = android.Manifest.permission.READ_EXTERNAL_STORAGE
+            context.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }
     }
 }

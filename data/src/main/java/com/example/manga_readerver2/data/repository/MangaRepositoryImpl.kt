@@ -127,7 +127,15 @@ class MangaRepositoryImpl(
                         cover_last_modified = m.coverLastModified,
                         date_added = m.dateAdded
                     )
-                    val dbManga = mangaQueries.getMangaByUrlAndSource(m.url, m.source).executeAsOne()
+                    var dbManga = mangaQueries.getMangaByUrlAndSource(m.url, m.source).executeAsOne()
+                    
+                    // Nếu manga đã tồn tại (INSERT OR IGNORE) nhưng chưa có thumbnail,
+                    // cập nhật thumbnail_url mới từ network
+                    if (!m.thumbnailUrl.isNullOrBlank() && (dbManga.thumbnail_url.isNullOrBlank() || dbManga.thumbnail_url != m.thumbnailUrl)) {
+                        mangaQueries.updateMangaThumbnail(m.thumbnailUrl, dbManga._id)
+                        dbManga = mangaQueries.getMangaByUrlAndSource(m.url, m.source).executeAsOne()
+                    }
+
                     mapManga(
                         dbManga._id, dbManga.source, dbManga.url, dbManga.artist, dbManga.author, 
                         dbManga.description, dbManga.genre, dbManga.title, dbManga.status, 
@@ -195,6 +203,17 @@ class MangaRepositoryImpl(
                 mapChapter(c._id, c.manga_id, c.url, c.name, c.scanlator, c.read, c.bookmark, c.last_page_read, c.chapter_number, c.source_order, c.date_fetch, c.date_upload, c.last_modified_at)
             }
         }
+    }
+
+    override fun getChaptersByMangaIdAsFlow(mangaId: Long): Flow<List<Chapter>> {
+        return chapterQueries.getChaptersByMangaId(mangaId)
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { list ->
+                list.map { c: DbChapter ->
+                    mapChapter(c._id, c.manga_id, c.url, c.name, c.scanlator, c.read, c.bookmark, c.last_page_read, c.chapter_number, c.source_order, c.date_fetch, c.date_upload, c.last_modified_at)
+                }
+            }
     }
 
     override suspend fun insertChapters(chapters: List<Chapter>) {
@@ -326,6 +345,7 @@ class MangaRepositoryImpl(
                         mangaTitle = h.mTitle,
                         chapterName = h.cName,
                         thumbnailUrl = h.tUrl,
+                        sourceId = h.mSource,
                         lastRead = h.lRead
                     )
                 }
@@ -385,7 +405,7 @@ class MangaRepositoryImpl(
             .asFlow()
             .mapToOne(Dispatchers.IO)
 
-        val totalTimeReadFlow = historyQueries.getTotalTimeRead()
+        val totalTimeReadFlow = historyQueries.getTotalTimeRead { sum -> sum ?: 0L }
             .asFlow()
             .mapToOne(Dispatchers.IO)
 
@@ -397,11 +417,11 @@ class MangaRepositoryImpl(
             val sourceStats = favorites.groupBy { it.source }.map { (sourceId, items) ->
                 SourceStat(sourceId, items.size)
             }
-            
+
             StatisticsData(
                 totalManga = favorites.size,
                 totalChaptersRead = readChapters.toInt(),
-                totalTimeMinutes = (((timeReadMs ?: 0L) as Long) / 60000L).toInt(),
+                totalTimeMinutes = (timeReadMs / 60000L).toInt(),
                 avgPagePerMinute = 0, // Cần log thêm page count để tính
                 sourceStats = sourceStats
             )

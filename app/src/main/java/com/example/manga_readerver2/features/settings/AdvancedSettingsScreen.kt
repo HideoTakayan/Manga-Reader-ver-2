@@ -41,10 +41,10 @@ class AdvancedSettingsScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("NĂ¢ng cao", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Nâng cao", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay láº¡i", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -57,7 +57,7 @@ class AdvancedSettingsScreen : Screen {
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                SettingsSectionHeader(title = "ThĂ´ng tin á»©ng dá»¥ng")
+                SettingsSectionHeader(title = "Thông tin ứng dụng")
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -70,7 +70,7 @@ class AdvancedSettingsScreen : Screen {
                         Icon(Icons.Outlined.Info, tint = Color.Gray, contentDescription = null, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(24.dp))
                         Column {
-                            Text("PhiĂªn báº£n", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                            Text("Phiên bản", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                             Text(
                                 "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                                 color = Color.Gray, fontSize = 13.sp
@@ -79,12 +79,12 @@ class AdvancedSettingsScreen : Screen {
                     }
                 }
 
-                SettingsSectionHeader(title = "Gá»¡ lá»—i")
+                SettingsSectionHeader(title = "Gỡ lỗi")
 
                 SettingsPreferenceItem(
                     icon = Icons.Default.BugReport,
-                    title = "ThĂ´ng tin á»©ng dá»¥ng (Há»‡ thá»‘ng)",
-                    subtitle = "Má»Ÿ cĂ i Ä‘áº·t á»©ng dá»¥ng Ä‘á»ƒ kiá»ƒm tra quyá»n, bá»™ nhá»›",
+                    title = "Thông tin ứng dụng (Hệ thống)",
+                    subtitle = "Mở cài đặt ứng dụng để kiểm tra quyền, bộ nhớ",
                     onClick = {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = Uri.fromParts("package", context.packageName, null)
@@ -96,8 +96,8 @@ class AdvancedSettingsScreen : Screen {
 
                 SettingsPreferenceItem(
                     icon = Icons.Default.Code,
-                    title = "Má»Ÿ ghi nháº­t kĂ½ há»‡ thá»‘ng",
-                    subtitle = "DĂ¹ng Logcat Ä‘á»ƒ xem debug logs cá»§a á»©ng dá»¥ng",
+                    title = "Mở ghi nhật ký hệ thống",
+                    subtitle = "Dùng Logcat để xem debug logs của ứng dụng",
                     onClick = {
                         val intent = Intent(Intent.ACTION_VIEW).apply {
                             data = Uri.parse("https://developer.android.com/studio/command-line/logcat")
@@ -107,12 +107,12 @@ class AdvancedSettingsScreen : Screen {
                     }
                 )
 
-                SettingsSectionHeader(title = "Báº£o trĂ¬")
+                SettingsSectionHeader(title = "Bảo trì")
 
                 SettingsPreferenceItem(
                     icon = Icons.Default.CleaningServices,
-                    title = "XĂ³a cache WebView (Cloudflare)",
-                    subtitle = "XĂ³a cookie vĂ  dá»¯ liá»‡u WebView, buá»™c giáº£i quyáº¿t láº¡i Cloudflare",
+                    title = "Xóa cache WebView (Cloudflare)",
+                    subtitle = "Xóa cookie và dữ liệu WebView, buộc giải quyết lại Cloudflare",
                     onClick = {
                         android.webkit.WebStorage.getInstance().deleteAllData()
                         android.webkit.CookieManager.getInstance().removeAllCookies(null)
@@ -124,11 +124,11 @@ class AdvancedSettingsScreen : Screen {
             if (showClearDbDialog) {
                 AlertDialog(
                     onDismissRequest = { showClearDbDialog = false },
-                    title = { Text("XĂ¡c nháº­n", color = Color.White) },
-                    text = { Text("Báº¡n cĂ³ cháº¯c muá»‘n xĂ³a toĂ n bá»™ dá»¯ liá»‡u? Thao tĂ¡c nĂ y khĂ´ng thá»ƒ hoĂ n tĂ¡c.", color = Color.White) },
+                    title = { Text("Xác nhận", color = Color.White) },
+                    text = { Text("Bạn có chắc muốn xóa toàn bộ dữ liệu? Thao tác này không thể hoàn tác.", color = Color.White) },
                     confirmButton = {
                         TextButton(onClick = { showClearDbDialog = false }) {
-                            Text("Há»§y", color = Color.Gray)
+                            Text("Hủy", color = Color.Gray)
                         }
                     },
                     containerColor = BackgroundDark

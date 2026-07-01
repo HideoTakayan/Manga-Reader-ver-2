@@ -57,8 +57,8 @@ getUpdates:
 SELECT chapters.*, manga.title AS mangaTitle, manga.thumbnail_url AS mangaThumbnail
 FROM chapters
 JOIN manga ON manga._id = chapters.manga_id
-WHERE manga.favorite = 1 AND chapters.date_upload > 0
-ORDER BY chapters.date_upload DESC
+WHERE manga.favorite = 1 AND chapters.date_fetch > manga.date_added
+ORDER BY chapters.date_fetch DESC
 LIMIT 50;
 
 getTotalReadChapters:

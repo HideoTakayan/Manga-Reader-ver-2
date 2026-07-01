@@ -1,4 +1,4 @@
-﻿package com.example.manga_readerver2.features.history
+package com.example.manga_readerver2.features.history
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -53,7 +54,7 @@ class HistoryScreen : Screen {
                             TextField(
                                 value = searchQuery,
                                 onValueChange = { screenModel.setSearchQuery(it) },
-                                placeholder = { Text("TĂ¬m trong lá»‹ch sá»­...", color = Color.White.copy(alpha = 0.5f)) },
+                                placeholder = { Text("Tìm trong lịch sử...", color = Color.White.copy(alpha = 0.5f)) },
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
@@ -67,7 +68,7 @@ class HistoryScreen : Screen {
                                 modifier = Modifier.fillMaxWidth()
                             )
                         } else {
-                            Text("Lá»‹ch sá»­", color = Color.White, fontWeight = FontWeight.ExtraBold)
+                            Text("Lịch sử", color = Color.White, fontWeight = FontWeight.ExtraBold)
                         }
                     },
                     actions = {
@@ -82,7 +83,7 @@ class HistoryScreen : Screen {
                             )
                         }
                         IconButton(onClick = { screenModel.clearAllHistory() }) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = "XĂ³a táº¥t cáº£", tint = Color.White)
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Xóa tất cả", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
@@ -95,8 +96,8 @@ class HistoryScreen : Screen {
                 } else if (history.isEmpty()) {
                     EmptyState(
                         Icons.Default.History, 
-                        "Lá»‹ch sá»­ trá»‘ng", 
-                        "CĂ¡c truyá»‡n báº¡n Ä‘Ă£ Ä‘á»c sáº½ xuáº¥t hiá»‡n táº¡i Ä‘Ă¢y."
+                        "Lịch sử trống", 
+                        "Các truyện bạn đã đọc sẽ xuất hiện tại đây."
                     )
                 } else {
                     val filteredHistory = if (searchQuery.isBlank()) {
@@ -112,8 +113,8 @@ class HistoryScreen : Screen {
                             val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
                             
                             when {
-                                isSameDay(calendar, today) -> "HĂ´m nay"
-                                isSameDay(calendar, yesterday) -> "HĂ´m qua"
+                                isSameDay(calendar, today) -> "Hôm nay"
+                                isSameDay(calendar, yesterday) -> "Hôm qua"
                                 else -> SimpleDateFormat("dd MMMM yyyy", Locale("vi")).format(Date(item.lastRead))
                             }
                         }
@@ -166,7 +167,7 @@ class HistoryScreen : Screen {
                                         ) {
                                             Icon(
                                                 Icons.Default.Delete,
-                                                contentDescription = "XĂ³a",
+                                                contentDescription = "Xóa",
                                                 tint = androidx.compose.ui.graphics.Color.White,
                                                 modifier = Modifier.padding(end = 20.dp)
                                             )
@@ -176,8 +177,12 @@ class HistoryScreen : Screen {
                                     HistoryCard(
                                         item = item,
                                         onClick = {
+                                            rootNavigator.push(com.example.manga_readerver2.features.reader.ReaderScreen(item.mangaId, item.chapterId))
+                                        },
+                                        onCoverClick = {
                                             rootNavigator.push(com.example.manga_readerver2.features.detail.MangaDetailScreen(item.mangaId))
-                                        }
+                                        },
+                                        isJsSource = screenModel.isJsSource(item.sourceId)
                                     )
                                 }
                             }
@@ -195,23 +200,45 @@ private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
 }
 
 @Composable
-fun HistoryCard(item: History, onClick: () -> Unit) {
+fun HistoryCard(item: History, onClick: () -> Unit, onCoverClick: () -> Unit, isJsSource: Boolean) {
+    val fakeManga = remember(item) {
+        com.example.manga_readerver2.domain.model.Manga(
+            id = item.mangaId,
+            source = item.sourceId,
+            url = "",
+            title = item.mangaTitle,
+            thumbnailUrl = item.thumbnailUrl
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         color = Color.White.copy(alpha = 0.05f),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Card(
-                modifier = Modifier.size(50.dp, 70.dp), 
-                shape = RoundedCornerShape(8.dp)
+            Box(
+                modifier = Modifier
+                    .size(50.dp, 70.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onCoverClick() }
             ) {
                 AsyncImage(
-                    model = item.thumbnailUrl,
+                    model = fakeManga,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+                if (isJsSource) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .background(Color(0xFF1565C0).copy(alpha = 0.85f), RoundedCornerShape(bottomEnd = 4.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text("JS", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {

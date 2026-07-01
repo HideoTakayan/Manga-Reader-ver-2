@@ -1,6 +1,11 @@
 package com.example.manga_readerver2
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -33,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import android.view.KeyEvent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.example.manga_readerver2.core.utils.VolumeKeyDispatcher
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,6 +46,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         NotificationHelper(this).createNotificationChannels()
         PermissionManager.requestNotificationPermission(this, 101)
+        requestStoragePermissionIfNeeded()
 
         handleIntent(intent)
 
@@ -84,12 +89,28 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        AppLockManager.onResume(this)
+        AppLockManager.setActivity(this)
     }
 
     override fun onPause() {
         super.onPause()
-        AppLockManager.onPause()
+        AppLockManager.setActivity(null)
+    }
+
+    /**
+     * Xin quyền đọc/ghi toàn bộ external storage giống Mihon.
+     * - Android 11+ (API 30+): Cần MANAGE_EXTERNAL_STORAGE, dẫn tới trang Settings của hệ thống.
+     * - Android 10 trở xuống: Dùng READ_EXTERNAL_STORAGE (đã khai báo trong manifest).
+     */
+    private fun requestStoragePermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            }
+        }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -117,24 +138,5 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (VolumeKeyDispatcher.isReaderActive) {
-            val readerPreferences = Injekt.get<com.example.manga_readerver2.core.preference.ReaderPreferences>()
-            if (readerPreferences.volumeKeysNavigation.get()) {
-                when (keyCode) {
-                    KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                        VolumeKeyDispatcher.dispatch(VolumeKeyDispatcher.VolumeEvent.DOWN)
-                        return true // Consume event
-                    }
-                    KeyEvent.KEYCODE_VOLUME_UP -> {
-                        VolumeKeyDispatcher.dispatch(VolumeKeyDispatcher.VolumeEvent.UP)
-                        return true // Consume event
-                    }
-                }
-            }
-        }
-        return super.onKeyDown(keyCode, event)
     }
 }

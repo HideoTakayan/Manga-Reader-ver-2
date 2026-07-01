@@ -8,15 +8,22 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import com.example.manga_readerver2.core.source.SourceManager
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 
 class HistoryScreenModel : ScreenModel {
     private val repository: MangaRepository = Injekt.get()
+    private val sourceManager: SourceManager = Injekt.get()
 
     private val _history = MutableStateFlow<List<History>>(emptyList())
     val history = _history.asStateFlow()
+
+    fun isJsSource(sourceId: Long): Boolean {
+        val source = sourceManager.get(sourceId)
+        return source is com.example.manga_readerver2.source_js.JsSource
+    }
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
@@ -56,6 +63,10 @@ class HistoryScreenModel : ScreenModel {
         screenModelScope.launch {
             _isLoading.value = true
             repository.getHistory()
+                .catch { 
+                    _isLoading.value = false
+                    it.printStackTrace()
+                }
                 .collect {
                     _history.value = it
                     _isLoading.value = false

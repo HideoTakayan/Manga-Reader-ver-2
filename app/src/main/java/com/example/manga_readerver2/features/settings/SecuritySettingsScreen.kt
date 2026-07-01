@@ -35,7 +35,7 @@ class SecuritySettingsScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Báº£o máº­t & Quyá»n riĂªng tÆ°", color = Color.White, fontWeight = FontWeight.Bold) },
+                    title = { Text("Bảo mật & Quyền riêng tư", color = Color.White, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -51,11 +51,11 @@ class SecuritySettingsScreen : Screen {
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                PreferenceHeader("KhĂ³a á»©ng dá»¥ng")
+                PreferenceHeader("Khóa ứng dụng")
 
                 PreferenceSwitchItem(
-                    title = "Báº­t khĂ³a á»©ng dá»¥ng",
-                    subtitle = "Sá»­ dá»¥ng vĂ¢n tay/khuĂ´n máº·t hoáº·c mĂ£ PIN Ä‘á»ƒ má»Ÿ khĂ³a",
+                    title = "Bật khóa ứng dụng",
+                    subtitle = "Sử dụng vân tay/khuôn mặt hoặc mã PIN để mở khóa",
                     checked = appLockEnabled,
                     onCheckedChange = { isEnabled ->
                         appLockEnabled = isEnabled
@@ -68,13 +68,13 @@ class SecuritySettingsScreen : Screen {
                 )
 
                 if (appLockEnabled) {
-                    PreferenceHeader("Thá»i gian khĂ³a")
+                    PreferenceHeader("Thời gian khóa")
                     val timeouts = listOf(
-                        0 to "KhĂ³a ngay láº­p tá»©c",
-                        1 to "1 phĂºt",
-                        2 to "2 phĂºt",
-                        5 to "5 phĂºt",
-                        10 to "10 phĂºt"
+                        0 to "Khóa ngay lập tức",
+                        1 to "1 phút",
+                        2 to "2 phút",
+                        5 to "5 phút",
+                        10 to "10 phút"
                     )
 
                     timeouts.forEach { (minutes, label) ->

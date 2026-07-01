@@ -34,7 +34,7 @@ class CategoryManagerScreen : Screen {
             containerColor = BackgroundDark,
             topBar = {
                 TopAppBar(
-                    title = { Text("Chá»‰nh sá»­a danh má»¥c", color = Color.White) },
+                    title = { Text("Chỉnh sửa danh mục", color = Color.White) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
@@ -71,12 +71,12 @@ class CategoryManagerScreen : Screen {
             if (showAddDialog) {
                 AlertDialog(
                     onDismissRequest = { showAddDialog = false },
-                    title = { Text("Danh má»¥c má»›i") },
+                    title = { Text("Danh mục mới") },
                     text = {
                         TextField(
                             value = newCategoryName,
                             onValueChange = { newCategoryName = it },
-                            placeholder = { Text("TĂªn danh má»¥c") },
+                            placeholder = { Text("Tên danh mục") },
                             singleLine = true
                         )
                     },
@@ -88,12 +88,12 @@ class CategoryManagerScreen : Screen {
                                 showAddDialog = false
                             }
                         }) {
-                            Text("ThĂªm", color = PrimaryOrange)
+                            Text("Thêm", color = PrimaryOrange)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showAddDialog = false }) {
-                            Text("Há»§y")
+                            Text("Hủy")
                         }
                     }
                 )

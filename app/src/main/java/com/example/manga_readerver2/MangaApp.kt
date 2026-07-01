@@ -17,6 +17,8 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import okhttp3.OkHttpClient
+import rx.plugins.RxJavaHooks
+import logcat.logcat
 
 class MangaApp : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: coil3.PlatformContext): ImageLoader {
@@ -35,6 +37,11 @@ class MangaApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         
         AndroidLogcatLogger.installOnDebuggableApp(this, minPriority = LogPriority.DEBUG)
+
+        // Catch Undeliverable RxJava exceptions from extensions to prevent app crashes
+        RxJavaHooks.setOnError { e ->
+            logcat(LogPriority.ERROR) { "Undeliverable RxJava exception: $e" }
+        }
 
         with(AppModule(this)) {
             Injekt.registerInjectables()
@@ -63,6 +70,9 @@ class MangaApp : Application(), SingletonImageLoader.Factory {
             context = this,
             autoClear = generalPreferences.autoClearCache.get()
         )
+
+        // Register AppLockManager
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(com.example.manga_readerver2.core.security.AppLockManager)
     }
 
     private fun cleanupTempFiles() {

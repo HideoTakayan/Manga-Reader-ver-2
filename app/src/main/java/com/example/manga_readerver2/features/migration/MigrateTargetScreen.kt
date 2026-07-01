@@ -143,7 +143,7 @@ fun MigrateMangaCard(manga: Manga, onClick: () -> Unit) {
             .clickable(onClick = onClick)
     ) {
         AsyncImage(
-            model = manga.thumbnailUrl,
+            model = manga,
             contentDescription = manga.title,
             modifier = Modifier
                 .fillMaxWidth()

@@ -109,20 +109,54 @@ class ExtensionInstaller(private val context: Context) {
             try {
                 step.value = InstallStep.Downloading
                 val api = Injekt.get<ExtensionApi>()
-                val request = Request.Builder().url(api.getApkUrl(extension)).build()
+                val downloadUrl = api.getApkUrl(extension)
+                logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
+                    "[INSTALL] Bắt đầu tải: ${extension.pkgName} từ $downloadUrl"
+                }
+                val request = Request.Builder().url(downloadUrl).build()
                 val response = httpClient.newCall(request).execute()
 
-                if (!response.isSuccessful) throw Exception("HTTP ${response.code} khi tải extension")
-                
+                if (!response.isSuccessful) throw Exception("HTTP ${response.code} khi tải extension từ $downloadUrl")
+
                 response.body?.byteStream()?.use { input ->
                     tmpFile.outputStream().use { output ->
                         input.copyTo(output)
                     }
                 }
+                logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
+                    "[INSTALL] Đã tải xong: ${tmpFile.absolutePath} (${tmpFile.length()} bytes)"
+                }
 
                 if (isZip) {
                     step.value = InstallStep.Installing
-                    installJsZip(tmpFile, extension.pkgName)
+                    val destDir = installJsZip(tmpFile, extension.pkgName)
+                    logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
+                        "[INSTALL] Đã giải nén ZIP vào: ${destDir.absolutePath}"
+                    }
+                    // Verify plugin.json exists after extraction
+                    val pluginJson = File(destDir, "plugin.json")
+                    if (!pluginJson.exists()) {
+                        // Check nested subdirectory (GitHub ZIP wraps in a root folder)
+                        val subDirs = destDir.listFiles { f -> f.isDirectory }
+                        val nested = subDirs?.firstOrNull { File(it, "plugin.json").exists() }
+                        if (nested != null) {
+                            logcat.logcat("ExtensionInstaller", logcat.LogPriority.WARN) {
+                                "[INSTALL] plugin.json nằm trong subfolder: ${nested.name}. Sẽ di chuyển lên thư mục gốc."
+                            }
+                            // Move nested contents up to destDir
+                            nested.listFiles()?.forEach { file ->
+                                file.copyRecursively(File(destDir, file.name), overwrite = true)
+                            }
+                            nested.deleteRecursively()
+                        } else {
+                            val files = destDir.listFiles()?.joinToString { it.name } ?: "(trống)"
+                            throw Exception("plugin.json không tìm thấy sau khi giải nén. Nội dung thư mục: $files")
+                        }
+                    }
+                    logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
+                        val contents = destDir.walkTopDown().filter { it.isFile }.joinToString(", ") { it.relativeTo(destDir).path }
+                        "[INSTALL] Nội dung sau cài: $contents"
+                    }
                     step.value = InstallStep.Installed
                     Injekt.get<ExtensionManager>().refreshInstalledExtensions()
                 } else {
@@ -131,7 +165,9 @@ class ExtensionInstaller(private val context: Context) {
                     step.value = InstallStep.SystemInstallStarted
                 }
             } catch (e: Exception) {
-                logcat.logcat("ExtensionInstaller", logcat.LogPriority.ERROR) { "Lỗi cài extension: ${e.message}" }
+                logcat.logcat("ExtensionInstaller", logcat.LogPriority.ERROR) {
+                    "[INSTALL] LỖI cài ${extension.pkgName}: ${e.message}\n${e.stackTraceToString()}"
+                }
                 tmpFile.delete()
                 step.value = InstallStep.Error
             }
@@ -145,18 +181,43 @@ class ExtensionInstaller(private val context: Context) {
             }
     }
 
-    private fun installJsZip(zipFile: File, pkgName: String) {
+    private fun installJsZip(zipFile: File, pkgName: String): File {
         val destDir = File(context.filesDir, "js_extensions/$pkgName")
         if (destDir.exists()) {
             destDir.deleteRecursively()
         }
         destDir.mkdirs()
+        logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
+            "[ZIP] Giải nén ${zipFile.name} (${zipFile.length()} bytes) -> ${destDir.absolutePath}"
+        }
 
         try {
+            var entryCount = 0
             java.util.zip.ZipInputStream(zipFile.inputStream()).use { zis ->
                 var entry = zis.nextEntry
                 while (entry != null) {
-                    val file = File(destDir, entry.name)
+                    entryCount++
+                    // Loại bỏ root folder nếu có (GitHub ZIP style: "truyenfull-main/plugin.json")
+                    val entryName = entry.name.let { name ->
+                        val parts = name.split("/")
+                        if (parts.size > 1 && parts[0].isNotEmpty() && !name.startsWith("src/") && !name.startsWith("plugin")) {
+                            // Check if first part looks like a root folder (not a known file/dir)
+                            parts.drop(1).joinToString("/")
+                        } else {
+                            name
+                        }
+                    }.trimStart('/')
+                    
+                    if (entryName.isEmpty()) {
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                        continue
+                    }
+                    
+                    val file = File(destDir, entryName)
+                    logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
+                        "[ZIP] Entry: ${entry.name} -> $entryName"
+                    }
                     if (entry.isDirectory) {
                         file.mkdirs()
                     } else {
@@ -168,9 +229,18 @@ class ExtensionInstaller(private val context: Context) {
                     entry = zis.nextEntry
                 }
             }
+            logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
+                "[ZIP] Giải nén xong: $entryCount entries"
+            }
+        } catch (e: Exception) {
+            logcat.logcat("ExtensionInstaller", logcat.LogPriority.ERROR) {
+                "[ZIP] Lỗi giải nén: ${e.message}"
+            }
+            throw e
         } finally {
             zipFile.delete()
         }
+        return destDir
     }
 
     private fun installApk(file: File) {

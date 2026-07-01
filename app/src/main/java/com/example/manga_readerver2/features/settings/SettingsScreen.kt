@@ -84,7 +84,7 @@ class SettingsScreen : Screen {
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        "PhiĂªn báº£n 2.5.0-VipPro",
+                        "Phiên bản 2.5.0-VipPro",
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
@@ -93,16 +93,16 @@ class SettingsScreen : Screen {
                 // Global Switches
                 MoreSwitch(
                     icon = Icons.Outlined.CloudOff,
-                    title = "Chá»‰ táº£i xuá»‘ng",
-                    subtitle = "Chá»‰ hiá»ƒn thá»‹ truyá»‡n Ä‘Ă£ táº£i xuá»‘ng trong thÆ° viá»‡n",
+                    title = "Chỉ tải xuống",
+                    subtitle = "Chỉ hiển thị truyện đã tải xuống trong thư viện",
                     checked = downloadedOnly,
                     onCheckedChange = { screenModel.setDownloadedOnly(it) }
                 )
 
                 MoreSwitch(
                     icon = Icons.Outlined.VisibilityOff,
-                    title = "Cháº¿ Ä‘á»™ áº©n danh",
-                    subtitle = "NgÆ°ng lÆ°u lá»‹ch sá»­ Ä‘á»c truyá»‡n",
+                    title = "Chế độ ẩn danh",
+                    subtitle = "Ngưng lưu lịch sử đọc truyện",
                     checked = incognitoMode,
                     onCheckedChange = { screenModel.setIncognitoMode(it) }
                 )
@@ -112,20 +112,20 @@ class SettingsScreen : Screen {
                 // General
                 MoreItem(
                     icon = Icons.Outlined.GetApp,
-                    title = "HĂ ng chá» táº£i xuá»‘ng",
-                    subtitle = if (queueCount > 0) "$queueCount chÆ°Æ¡ng Ä‘ang chá»" else null,
+                    title = "Hàng chờ tải xuống",
+                    subtitle = if (queueCount > 0) "$queueCount chương đang chờ" else null,
                     onClick = { rootNavigator.push(DownloadQueueScreen()) }
                 )
                 
                 MoreItem(
                     icon = Icons.Outlined.Label,
-                    title = "Danh má»¥c",
+                    title = "Danh mục",
                     onClick = { rootNavigator.push(com.example.manga_readerver2.features.library.CategoryManagerScreen()) }
                 )
 
                 MoreItem(
                     icon = Icons.Outlined.QueryStats,
-                    title = "Thá»‘ng kĂª",
+                    title = "Thống kê",
                     onClick = { rootNavigator.push(com.example.manga_readerver2.features.statistics.StatisticsScreen()) }
                 )
 
@@ -134,8 +134,8 @@ class SettingsScreen : Screen {
                 // Data management
                 MoreItem(
                     icon = Icons.Outlined.DeleteSweep,
-                    title = "XĂ³a bá»™ nhá»› Ä‘á»‡m",
-                    subtitle = "Dung lÆ°á»£ng hiá»‡n táº¡i: $cacheSize",
+                    title = "Xóa bộ nhớ đệm",
+                    subtitle = "Dung lượng hiện tại: $cacheSize",
                     onClick = { screenModel.clearCache() }
                 )
                 
@@ -144,25 +144,25 @@ class SettingsScreen : Screen {
                 // Settings & Others
                 MoreItem(
                     icon = Icons.Outlined.Settings,
-                    title = "CĂ i Ä‘áº·t",
+                    title = "Cài đặt",
                     onClick = { rootNavigator.push(SettingsDetailScreen()) }
                 )
 
                 MoreItem(
                     icon = Icons.Outlined.VolunteerActivism,
-                    title = "á»¦ng há»™ chĂºng tĂ´i",
+                    title = "Ủng hộ chúng tôi",
                     onClick = { uriHandler.openUri("https://github.com/Darkrai9x") }
                 )
                 
                 MoreItem(
                     icon = Icons.Outlined.Info,
-                    title = "ThĂ´ng tin",
-                    onClick = { /* Hiá»ƒn thá»‹ dialog thĂ´ng tin hoáº·c trang web */ }
+                    title = "Thông tin",
+                    onClick = { /* Hiển thị dialog thông tin hoặc trang web */ }
                 )
 
                 MoreItem(
                     icon = Icons.Outlined.HelpOutline,
-                    title = "Trá»£ giĂºp",
+                    title = "Trợ giúp",
                     onClick = { uriHandler.openUri("https://mihon.app/docs") }
                 )
 

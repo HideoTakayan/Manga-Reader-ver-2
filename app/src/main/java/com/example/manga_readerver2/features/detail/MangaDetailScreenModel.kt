@@ -33,6 +33,14 @@ enum class ChapterFilter {
     ALL, UNREAD, DOWNLOADED
 }
 
+enum class DownloadAction {
+    NEXT_1_CHAPTER,
+    NEXT_5_CHAPTERS,
+    NEXT_10_CHAPTERS,
+    UNREAD_CHAPTERS,
+    ALL_CHAPTERS
+}
+
 class MangaDetailScreenModel(
     private val mangaRepository: MangaRepository = Injekt.get(),
     private val extensionManager: ExtensionManager = Injekt.get(),
@@ -58,6 +66,7 @@ class MangaDetailScreenModel(
     private val _source = MutableStateFlow<Source?>(null)
     val source: StateFlow<Source?> = _source.asStateFlow()
 
+    private var chapterCollectJob: kotlinx.coroutines.Job? = null
     private val _allChapters = MutableStateFlow<List<Chapter>>(emptyList())
     
     val chapters: StateFlow<List<Chapter>> = combine(
@@ -90,10 +99,40 @@ class MangaDetailScreenModel(
     private val _isLiked = MutableStateFlow(false)
     val isLiked: StateFlow<Boolean> = _isLiked.asStateFlow()
 
+    // Download state map for UI
+    val downloadStatus: StateFlow<Map<Long, com.example.manga_readerver2.core.download.Download.State>> = combine(
+        _allChapters,
+        downloadManager.queueState,
+        downloadCache.isInitializing
+    ) { chapters, queue, _ ->
+        val map = mutableMapOf<Long, com.example.manga_readerver2.core.download.Download.State>()
+        val m = _manga.value
+        chapters.forEach { chapter ->
+            val download = queue.find { it.chapter.id == chapter.id }
+            if (download != null) {
+                map[chapter.id] = download.status
+            } else if (m != null && downloadCache.isChapterDownloaded(m.id, chapter.name)) {
+                map[chapter.id] = com.example.manga_readerver2.core.download.Download.State.DOWNLOADED
+            } else {
+                map[chapter.id] = com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
+            }
+        }
+        map
+    }.stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     fun loadMangaDetail(mangaId: Long) {
         screenModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
+            
+            // Lắng nghe thay đổi từ cơ sở dữ liệu để tự động cập nhật UI
+            chapterCollectJob?.cancel()
+            chapterCollectJob = launch {
+                mangaRepository.getChaptersByMangaIdAsFlow(mangaId).collect { chapters ->
+                    _allChapters.value = chapters
+                }
+            }
+            
             val m = mangaRepository.getMangaById(mangaId)
 
             if (m == null) {
@@ -126,10 +165,12 @@ class MangaDetailScreenModel(
                             artist = networkManga.artist ?: manga.artist,
                             description = networkManga.description ?: manga.description,
                             genre = networkManga.genre?.split(", ")?.map { it.trim() } ?: manga.genre,
+                            thumbnailUrl = networkManga.thumbnail_url?.takeIf { it.isNotBlank() } ?: manga.thumbnailUrl,
                             status = networkManga.status.toLong(),
                             initialized = true
                         )
-                        mangaRepository.updateMangaDetails(manga)
+                        // Dùng updateManga (không phải updateMangaDetails) để lưu cả thumbnailUrl
+                        mangaRepository.updateManga(manga)
                         _manga.value = manga
                     } catch (e: Exception) {
                         val errorText = "Lỗi tải thông tin truyện: ${e.message}"
@@ -139,33 +180,24 @@ class MangaDetailScreenModel(
                 }
             }
 
-            // Tải danh sách chương
-            screenModelScope.launch(Dispatchers.IO) {
+            // Tải danh sách chương — BUG-7 fix: join child job để _isLoading=false chỉ sau khi fetch xong
+            val chapterJob = screenModelScope.launch(Dispatchers.IO) {
                 val dbChapters = mangaRepository.getChaptersByMangaId(mangaId)
+                val currentSource = _source.value
                 
-            val currentSource = _source.value
-            // Nếu chưa có trong DB, tải từ mạng
-            if (dbChapters.isEmpty() && currentSource != null) {
-                try {
-                    val sManga = SManga.create().apply {
-                        url = manga.url
-                        title = manga.title
-                    }
-                    val networkChapters: List<SChapter> = currentSource.getChapterList(sManga)
-                        val chapters = networkChapters.map { networkChapter ->
-                            // Use ChapterRecognition to clean up the name and extract the number
+                if (dbChapters.isEmpty() && currentSource != null) {
+                    try {
+                        val sManga = SManga.create().apply {
+                            url = manga.url
+                            title = manga.title
+                        }
+                        val networkChapters = withContext(Dispatchers.IO) { currentSource.getChapterList(sManga) }
+                        
+                        val chapters = networkChapters.mapIndexed { index, networkChapter ->
+                            // Tính chapterNumber giống Mihon (từ tên chương, hoặc từ index nếu không bóc tách được)
                             val recognizedNumber = com.example.manga_readerver2.core.utils.ChapterRecognition.parseChapterNumber(networkChapter.name)
-                            val finalNumber = if (networkChapter.chapter_number >= 0f) networkChapter.chapter_number else recognizedNumber
+                            val finalNumber = if (recognizedNumber > -1f) recognizedNumber else (networkChapters.size - index).toFloat()
                             
-                            // Use the cleaned up display title if possible, else original
-                            var cleanName = networkChapter.name
-                            if (finalNumber >= 0f) {
-                                // Try to get a cleaner display title, but keep original if the original isn't just a generic filename.
-                                // If the original name looks like "Chương 1 - Hello", we might want to keep it.
-                                // Actually, let's just use the recognition logic to assign a proper chapterNumber,
-                                // and optionally clean the name. For now we will keep the original name but ensure number is set.
-                            }
-
                             Chapter(
                                 id = 0L,
                                 mangaId = mangaId,
@@ -182,14 +214,13 @@ class MangaDetailScreenModel(
                         }
                         mangaRepository.insertChapters(chapters)
                     } catch (e: Exception) {
-                        val errorText = "Lỗi tải danh sách chương: ${e.message}"
                         logcat(LogPriority.ERROR) { "Error fetching chapter list: ${e.message}\n${e.stackTraceToString().take(500)}" }
-                        _errorMessage.value = errorText
+                        _errorMessage.value = "Lỗi tải danh sách chương: ${e.message}"
                     }
                 }
-                
-                _allChapters.value = mangaRepository.getChaptersByMangaId(mangaId)
             }
+            // Đợi child job xong rồi mới tắt loading spinner
+            chapterJob.join()
             _isLoading.value = false
         }
     }
@@ -221,34 +252,48 @@ class MangaDetailScreenModel(
                 mangaRepository.updateManga(updatedManga)
                 _manga.value = updatedManga
                 
-                // Update chapters
+                // Update chapters — BUG-2 fix: merge với DB để giữ read/bookmark/lastPageRead
                 val networkChapters = withContext(Dispatchers.IO) { source.getChapterList(sManga) }
-                val chapters = networkChapters.map { sChapter ->
+                
+                // Lấy map chapter hiện tại trong DB theo URL để merge state
+                val existingByUrl = mangaRepository.getChaptersByMangaId(m.id)
+                    .associateBy { it.url }
+                
+                val mergedChapters = networkChapters.map { sChapter ->
                     val recognizedNumber = com.example.manga_readerver2.core.utils.ChapterRecognition.parseChapterNumber(sChapter.name)
                     val finalNumber = if (sChapter.chapter_number >= 0f) sChapter.chapter_number else recognizedNumber
+                    val existing = existingByUrl[sChapter.url]
                     
                     com.example.manga_readerver2.domain.model.Chapter(
-                        id = 0L,
+                        // Giữ ID cũ nếu đã có → INSERT OR IGNORE sẽ không ghi đè
+                        id = existing?.id ?: 0L,
                         mangaId = m.id,
                         url = sChapter.url,
                         name = sChapter.name,
                         chapterNumber = finalNumber,
                         scanlator = sChapter.scanlator,
-                        read = false,
-                        bookmark = false,
-                        lastPageRead = 0L,
+                        // Giữ trạng thái đọc và bookmark từ DB
+                        read = existing?.read ?: false,
+                        bookmark = existing?.bookmark ?: false,
+                        lastPageRead = existing?.lastPageRead ?: 0L,
+                        // Giữ dateUpload gốc từ network nếu có, ngược lại giữ của DB
+                        dateUpload = if (sChapter.date_upload > 0) sChapter.date_upload else existing?.dateUpload ?: 0L,
                         dateFetch = System.currentTimeMillis()
                     )
                 }
-                mangaRepository.insertChapters(chapters)
-                _allChapters.value = mangaRepository.getChaptersByMangaId(m.id)
+                // Lưu vào DB
+                mangaRepository.insertChapters(mergedChapters)
+                
+                // Cập nhật lại UI state (Không cần gán tay nữa vì Flow đã xử lý tự động)
             } catch (e: Exception) {
-                e.printStackTrace()
+                logcat(LogPriority.ERROR) { "Lỗi khi refresh chi tiết truyện: ${e.message}" }
                 _errorMessage.value = "Lỗi làm mới dữ liệu: ${e.message}"
+            } finally {
+                _isLoading.value = false
             }
-            _isLoading.value = false
         }
     }
+
 
     fun downloadChapter(chapter: com.example.manga_readerver2.domain.model.Chapter) {
         val m = _manga.value ?: return
@@ -263,6 +308,37 @@ class MangaDetailScreenModel(
         if (toDownload.isNotEmpty()) {
             downloadManager.downloadChapters(m, toDownload, source)
         }
+    }
+
+    fun runDownloadAction(action: DownloadAction) {
+        val m = _manga.value ?: return
+        val source = sourceManager.get(m.source) ?: return
+        val chapters = _allChapters.value
+            .sortedWith(compareByDescending<Chapter> { it.chapterNumber }.thenByDescending { it.dateUpload })
+        
+        val chaptersToDownload = when (action) {
+            DownloadAction.NEXT_1_CHAPTER -> getNextUnreadChapters(chapters, 1)
+            DownloadAction.NEXT_5_CHAPTERS -> getNextUnreadChapters(chapters, 5)
+            DownloadAction.NEXT_10_CHAPTERS -> getNextUnreadChapters(chapters, 10)
+            DownloadAction.UNREAD_CHAPTERS -> chapters.filter { !it.read }
+            DownloadAction.ALL_CHAPTERS -> chapters
+        }
+
+        // Lọc bớt những chương đã tải
+        val notDownloaded = chaptersToDownload.filter { chapter ->
+            !downloadCache.isChapterDownloaded(m.id, chapter.name)
+        }
+
+        if (notDownloaded.isNotEmpty()) {
+            downloadManager.downloadChapters(m, notDownloaded, source)
+        }
+    }
+
+    private fun getNextUnreadChapters(chapters: List<Chapter>, count: Int): List<Chapter> {
+        // chapters đang được sort theo DESC (mới nhất ở trên)
+        // Để lấy "Tiếp theo", ta cần tìm chương chưa đọc cũ nhất, và lấy từ đó đi lên.
+        // Tức là ta sẽ lật ngược list thành ASC, tìm chương chưa đọc đầu tiên, rồi take(count)
+        return chapters.reversed().filter { !it.read }.take(count)
     }
 
     fun markChaptersRead(chapterIds: List<Long>, read: Boolean) {

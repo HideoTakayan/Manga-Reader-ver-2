@@ -5,20 +5,31 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-object AppLockManager {
+object AppLockManager : DefaultLifecycleObserver {
     private val _isLocked = MutableStateFlow(false)
     val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
 
     private var lastPauseTime = 0L
     private val securityPreferences by lazy { Injekt.get<SecurityPreferences>() }
+    private var currentActivity: FragmentActivity? = null
 
-    fun onResume(activity: FragmentActivity) {
+    // Call this from MainActivity to keep track of the current activity for BiometricPrompt
+    fun setActivity(activity: FragmentActivity?) {
+        currentActivity = activity
+        if (activity != null && _isLocked.value) {
+            promptUnlock(activity)
+        }
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
         if (!securityPreferences.appLockEnabled.get()) {
             _isLocked.value = false
             return
@@ -28,7 +39,7 @@ object AppLockManager {
         val timeoutMillis = timeoutMinutes * 60 * 1000L
         val now = System.currentTimeMillis()
 
-        if (lastPauseTime > 0 && (now - lastPauseTime) > timeoutMillis) {
+        if (lastPauseTime > 0 && (now - lastPauseTime) >= timeoutMillis) {
             _isLocked.value = true
         } else if (lastPauseTime == 0L) {
             // First launch
@@ -36,11 +47,11 @@ object AppLockManager {
         }
 
         if (_isLocked.value) {
-            promptUnlock(activity)
+            currentActivity?.let { promptUnlock(it) }
         }
     }
 
-    fun onPause() {
+    override fun onStop(owner: LifecycleOwner) {
         if (securityPreferences.appLockEnabled.get()) {
             lastPauseTime = System.currentTimeMillis()
         }

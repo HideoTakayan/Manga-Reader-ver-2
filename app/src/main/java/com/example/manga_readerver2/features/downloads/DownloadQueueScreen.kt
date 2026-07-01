@@ -40,21 +40,21 @@ class DownloadQueueScreen : Screen {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("HĂ ng Ä‘á»£i táº£i xuá»‘ng", color = Color.White) },
+                    title = { Text("Hàng đợi tải xuống", color = Color.White) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay láº¡i", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
                         }
                     },
                     actions = {
                         IconButton(onClick = { downloadManager.retryAllFailed() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Táº£i láº¡i cĂ¡c má»¥c lá»—i", tint = Color.White)
+                            Icon(Icons.Default.Refresh, contentDescription = "Tải lại các mục lỗi", tint = Color.White)
                         }
                         IconButton(onClick = { downloadManager.startDownloads() }) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Tiáº¿p tá»¥c", tint = Color.White)
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Tiếp tục", tint = Color.White)
                         }
                         IconButton(onClick = { downloadManager.pauseDownloads() }) {
-                            Icon(Icons.Default.Pause, contentDescription = "Táº¡m dá»«ng", tint = Color.White)
+                            Icon(Icons.Default.Pause, contentDescription = "Tạm dừng", tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E1E1E))
@@ -64,7 +64,7 @@ class DownloadQueueScreen : Screen {
         ) { paddingValues ->
             if (queue.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("KhĂ´ng cĂ³ tiáº¿n trĂ¬nh táº£i nĂ o", color = Color.Gray, fontSize = 16.sp)
+                    Text("Không có tiến trình tải nào", color = Color.Gray, fontSize = 16.sp)
                 }
             } else {
                 LazyColumn(
@@ -106,11 +106,11 @@ class DownloadQueueScreen : Screen {
                 Spacer(modifier = Modifier.height(4.dp))
                 
                 val statusText = when (status) {
-                    Download.State.QUEUE -> "Äang chá»"
-                    Download.State.DOWNLOADING -> "Äang táº£i... $progress%"
-                    Download.State.COMPRESSING -> "Äang nĂ©n file"
-                    Download.State.DOWNLOADED -> "HoĂ n táº¥t"
-                    Download.State.ERROR -> "Lá»—i"
+                    Download.State.QUEUE -> "Đang chờ"
+                    Download.State.DOWNLOADING -> "Đang tải... $progress%"
+                    Download.State.COMPRESSING -> "Đang nén file"
+                    Download.State.DOWNLOADED -> "Hoàn tất"
+                    Download.State.ERROR -> "Lỗi"
                     else -> ""
                 }
                 Text(text = statusText, color = Color(0xFFFF6D00), fontSize = 12.sp)
@@ -127,7 +127,7 @@ class DownloadQueueScreen : Screen {
             }
             
             IconButton(onClick = { manager.cancelDownload(download) }) {
-                Icon(Icons.Default.Cancel, contentDescription = "Há»§y", tint = Color.Gray)
+                Icon(Icons.Default.Cancel, contentDescription = "Hủy", tint = Color.Gray)
             }
         }
     }

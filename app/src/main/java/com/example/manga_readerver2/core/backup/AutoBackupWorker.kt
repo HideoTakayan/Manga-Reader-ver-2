@@ -30,7 +30,8 @@ class AutoBackupWorker(
             val backupString = backupManager.createBackupString()
             
             if (backupString != null) {
-                val backupDir = File(context.getExternalFilesDir(null), "backups")
+                val fileManager = com.example.manga_readerver2.core.utils.FileManager(context)
+                val backupDir = fileManager.getBackupPath()
                 if (!backupDir.exists()) {
                     backupDir.mkdirs()
                 }

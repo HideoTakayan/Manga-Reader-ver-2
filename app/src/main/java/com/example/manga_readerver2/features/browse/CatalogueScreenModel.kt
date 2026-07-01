@@ -18,6 +18,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import com.example.manga_readerver2.core.source.SourceManager
@@ -60,22 +64,30 @@ class CatalogueScreenModel(
         }
     }
 
-    fun getMangaFlow(): Flow<PagingData<Manga>> {
-        val currentSource = source ?: return emptyFlow()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val mangaFlow: Flow<PagingData<Manga>> = combine(
+        _sourceId.filterNotNull(),
+        _listing,
+        _searchQuery,
+        _filters
+    ) { sourceId, listing, query, filters ->
+        val currentSource = sourceManager.get(sourceId) as? CatalogueSource
+            ?: return@combine emptyFlow<PagingData<Manga>>()
         
-        return Pager(
+        Pager(
             config = PagingConfig(pageSize = 20, enablePlaceholders = false),
             pagingSourceFactory = {
                 SourcePagingSource(
                     source = currentSource,
                     sourceId = currentSource.id,
-                    query = _searchQuery.value,
-                    filters = _filters.value,
-                    listing = _listing.value
+                    query = query,
+                    filters = filters,
+                    listing = listing
                 )
             }
-        ).flow.cachedIn(screenModelScope)
-    }
+        ).flow
+    }.flatMapLatest { it }.cachedIn(screenModelScope)
+
 
     fun setListing(newListing: Listing) {
         if (_listing.value != newListing) {

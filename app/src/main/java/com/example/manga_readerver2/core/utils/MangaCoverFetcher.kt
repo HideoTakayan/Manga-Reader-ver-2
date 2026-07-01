@@ -13,6 +13,7 @@ import okhttp3.Request
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import logcat.logcat
+import okio.Path.Companion.toPath
 
 class MangaCoverFetcher(
     private val manga: Manga,
@@ -22,15 +23,68 @@ class MangaCoverFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? {
-        val url = manga.thumbnailUrl ?: return null
+        val source = sourceManager.get(manga.source)
+        
+        // 1. Kiểm tra ảnh offline trước (Mihon behavior)
+        if (source != null) {
+            try {
+                val fileManager = Injekt.get<com.example.manga_readerver2.core.utils.FileManager>()
+                val mangaDir = fileManager.getDownloadPath().resolve(source.name).resolve(manga.title + "_" + manga.id)
+                val coverFile = java.io.File(mangaDir, "cover.jpg")
+                if (coverFile.exists() && coverFile.length() > 0) {
+                    return coil3.fetch.SourceFetchResult(
+                        source = coil3.decode.ImageSource(
+                            file = coverFile.absolutePath.toPath(),
+                            fileSystem = okio.FileSystem.SYSTEM
+                        ),
+                        mimeType = "image/jpeg",
+                        dataSource = DataSource.DISK
+                    )
+                }
+            } catch (e: Exception) {
+                // Ignore and fallback to network
+            }
+        }
+
+        // 2. Fallback to Network
+        var url = manga.thumbnailUrl ?: return null
+        if (url.startsWith("//")) url = "https:$url"
         if (url.startsWith("http").not()) return null
 
-        val source = sourceManager.get(manga.source) as? HttpSource
-        val client = source?.client ?: Injekt.get<okhttp3.OkHttpClient>()
-        val headers = source?.headers
+        val jsSource = source as? com.example.manga_readerver2.source_js.JsSource
+        val client = (source as? HttpSource)?.client 
+            ?: (if (jsSource != null) Injekt.get<eu.kanade.tachiyomi.network.NetworkHelper>().cloudflareClient else Injekt.get<okhttp3.OkHttpClient>())
+        val headers = (source as? HttpSource)?.headers 
+            ?: jsSource?.headers
 
         val requestBuilder = Request.Builder().url(url)
-        headers?.let { requestBuilder.headers(it) }
+        var hasReferer = false
+        headers?.let { 
+            requestBuilder.headers(it) 
+            hasReferer = it["Referer"] != null
+        }
+        
+        // Inject Referer for JS Extensions:
+        // Phải dùng domain của TRANG TRUYỆN (manga.url) làm Referer,
+        // KHÔNG dùng domain của CDN image URL.
+        // Ví dụ: ảnh từ i200.truyenvua.com cần Referer = https://truyenqqko.com/ (manga site)
+        if (!hasReferer) {
+            val refererUrl = when {
+                // JS source: lấy Referer từ manga page URL
+                jsSource != null && manga.url.startsWith("http") -> manga.url
+                // Fallback cho non-JS source: dùng image URL domain
+                url.isNotBlank() -> url
+                else -> null
+            }
+            if (refererUrl != null) {
+                try {
+                    val uri = java.net.URI(refererUrl)
+                    if (uri.host != null) {
+                        requestBuilder.addHeader("Referer", "${uri.scheme}://${uri.host}/")
+                    }
+                } catch (_: Exception) { }
+            }
+        }
 
         val request = requestBuilder.build()
         

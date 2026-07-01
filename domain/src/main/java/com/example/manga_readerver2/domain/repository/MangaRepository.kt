@@ -24,6 +24,7 @@ interface MangaRepository {
 
     // Chapters
     suspend fun getChaptersByMangaId(mangaId: Long): List<Chapter>
+    fun getChaptersByMangaIdAsFlow(mangaId: Long): Flow<List<Chapter>>
 
     suspend fun insertChapters(chapters: List<Chapter>)
 

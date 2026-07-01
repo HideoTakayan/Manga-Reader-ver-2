@@ -17,6 +17,7 @@ object ImageBorderCropper {
      * Giá trị cao hơn = cắt nhiều hơn (hành xử như Mihon: ~240).
      */
     private const val WHITE_THRESHOLD = 240
+    private const val BLACK_THRESHOLD = 15
 
     /**
      * Trả về [Rect] crop cho [bitmap] nếu phát hiện viền trắng đáng kể.
@@ -67,14 +68,14 @@ object ImageBorderCropper {
                 // Byte thứ 4 (Alpha) bỏ qua. Do đó cách dễ nhất:
                 // Vì màu trắng thì R, G, B đều lớn. Nên check 3 byte thấp hoặc 3 byte bất kỳ trong 4 byte.
             }
-            return isWhitePixel(pixel)
+            return isBorderPixel(pixel)
         }
 
         // Scan từ trên xuống
         outer@ for (y in 0 until h) {
             val rowOffset = y * w
             for (x in 0 until w) {
-                if (!isWhitePixel(pixels[rowOffset + x])) {
+                if (!isBorderPixel(pixels[rowOffset + x])) {
                     top = y
                     break@outer
                 }
@@ -85,7 +86,7 @@ object ImageBorderCropper {
         outer@ for (y in h - 1 downTo top) {
             val rowOffset = y * w
             for (x in 0 until w) {
-                if (!isWhitePixel(pixels[rowOffset + x])) {
+                if (!isBorderPixel(pixels[rowOffset + x])) {
                     bottom = y + 1
                     break@outer
                 }
@@ -95,7 +96,7 @@ object ImageBorderCropper {
         // Scan từ trái sang phải
         outer@ for (x in 0 until w) {
             for (y in top until bottom) {
-                if (!isWhitePixel(pixels[y * w + x])) {
+                if (!isBorderPixel(pixels[y * w + x])) {
                     left = x
                     break@outer
                 }
@@ -105,7 +106,7 @@ object ImageBorderCropper {
         // Scan từ phải sang trái
         outer@ for (x in w - 1 downTo left) {
             for (y in top until bottom) {
-                if (!isWhitePixel(pixels[y * w + x])) {
+                if (!isBorderPixel(pixels[y * w + x])) {
                     right = x + 1
                     break@outer
                 }
@@ -221,10 +222,13 @@ object ImageBorderCropper {
         }
     }
 
-    private fun isWhitePixel(pixel: Int): Boolean {
+    private fun isBorderPixel(pixel: Int): Boolean {
         val r = (pixel shr 16) and 0xFF
         val g = (pixel shr 8) and 0xFF
         val b = pixel and 0xFF
-        return r >= WHITE_THRESHOLD && g >= WHITE_THRESHOLD && b >= WHITE_THRESHOLD
+        
+        val isWhite = r >= WHITE_THRESHOLD && g >= WHITE_THRESHOLD && b >= WHITE_THRESHOLD
+        val isBlack = r <= BLACK_THRESHOLD && g <= BLACK_THRESHOLD && b <= BLACK_THRESHOLD
+        return isWhite || isBlack
     }
 }

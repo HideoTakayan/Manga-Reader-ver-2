@@ -40,7 +40,7 @@ fun TtsPlayerBar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Äang Ä‘á»c ná»™i dung...", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Đang đọc nội dung...", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Row {
                     IconButton(onClick = onShowSettings) {
                         Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -98,18 +98,18 @@ fun TtsSettingsDialog(
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("CĂ i Ä‘áº·t Giá»ng Äá»c", fontWeight = FontWeight.Bold) },
+        title = { Text("Cài đặt Giọng Đọc", fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (availableVoices.isNotEmpty()) {
-                    Text("Giá»ng Ä‘á»c", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("Giọng đọc", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     Spacer(modifier = Modifier.height(4.dp))
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded }
                     ) {
                         OutlinedTextField(
-                            value = selectedVoice?.name?.substringAfterLast("-") ?: "Máº·c Ä‘á»‹nh",
+                            value = selectedVoice?.name?.substringAfterLast("-") ?: "Mặc định",
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -138,7 +138,7 @@ fun TtsSettingsDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                Text("Tá»‘c Ä‘á»™ Ä‘á»c: ${(currentSpeed * 100).toInt()}%", fontSize = 14.sp)
+                Text("Tốc độ đọc: ${(currentSpeed * 100).toInt()}%", fontSize = 14.sp)
                 Slider(
                     value = currentSpeed,
                     onValueChange = { speed: Float -> screenModel.updateTtsSpeed(speed) },
@@ -148,7 +148,7 @@ fun TtsSettingsDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Text("Äá»™ cao giá»ng: ${(currentPitch * 100).toInt()}%", fontSize = 14.sp)
+                Text("Độ cao giọng: ${(currentPitch * 100).toInt()}%", fontSize = 14.sp)
                 Slider(
                     value = currentPitch,
                     onValueChange = { pitch: Float -> screenModel.updateTtsPitch(pitch) },

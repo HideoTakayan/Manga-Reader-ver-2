@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.DownloadForOffline
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -69,17 +70,19 @@ class UpdatesScreen : Screen {
                     // VIP: Group updates by date
                     val groupedUpdates = remember(updates) {
                         updates.groupBy { item ->
-                            val calendar = java.util.Calendar.getInstance().apply { timeInMillis = item.dateUpload }
+                            val calendar = java.util.Calendar.getInstance().apply { timeInMillis = item.dateFetch }
                             val today = java.util.Calendar.getInstance()
                             val yesterday = java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_YEAR, -1) }
                             
                             when {
                                 isSameDay(calendar, today) -> "Hôm nay"
                                 isSameDay(calendar, yesterday) -> "Hôm qua"
-                                else -> java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale("vi")).format(java.util.Date(item.dateUpload))
+                                else -> java.text.SimpleDateFormat("dd MMMM yyyy", java.util.Locale("vi")).format(java.util.Date(item.dateFetch))
                             }
                         }
                     }
+
+                    val downloadStatus by screenModel.downloadStatus.collectAsState()
 
                     LazyColumn(
                         contentPadding = PaddingValues(16.dp),
@@ -104,9 +107,11 @@ class UpdatesScreen : Screen {
                             }
 
                             items(items) { update ->
+                                val state = downloadStatus[update.chapterId] ?: com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
                                 UpdateCard(
                                     update = update,
-                                    onClick = { rootNavigator.push(com.example.manga_readerver2.features.detail.MangaDetailScreen(update.mangaId)) }
+                                    onClick = { rootNavigator.push(com.example.manga_readerver2.features.detail.MangaDetailScreen(update.mangaId)) },
+                                    downloadState = state
                                 )
                             }
                         }
@@ -123,7 +128,11 @@ private fun isSameDay(cal1: java.util.Calendar, cal2: java.util.Calendar): Boole
 }
 
 @Composable
-fun UpdateCard(update: com.example.manga_readerver2.domain.model.Update, onClick: () -> Unit) {
+fun UpdateCard(
+    update: com.example.manga_readerver2.domain.model.Update,
+    onClick: () -> Unit,
+    downloadState: com.example.manga_readerver2.core.download.Download.State = com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
+) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         color = Color.White.copy(alpha = 0.05f),
@@ -167,13 +176,34 @@ fun UpdateCard(update: com.example.manga_readerver2.domain.model.Update, onClick
                     fontWeight = if (update.read) FontWeight.Normal else FontWeight.Bold
                 )
             }
-            IconButton(onClick = { /* Download */ }) {
-                Icon(
-                    Icons.Default.DownloadForOffline, 
-                    contentDescription = "Tải xuống", 
-                    tint = Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier.size(24.dp)
-                )
+            
+            IconButton(onClick = { /* Download action not fully implemented here yet, handled via detail screen usually */ }) {
+                when (downloadState) {
+                    com.example.manga_readerver2.core.download.Download.State.DOWNLOADED -> {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Đã tải",
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    com.example.manga_readerver2.core.download.Download.State.DOWNLOADING,
+                    com.example.manga_readerver2.core.download.Download.State.QUEUE -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = PrimaryOrange,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    else -> {
+                        Icon(
+                            imageVector = Icons.Default.DownloadForOffline, 
+                            contentDescription = "Tải xuống", 
+                            tint = Color.White.copy(alpha = 0.3f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
             }
         }
     }

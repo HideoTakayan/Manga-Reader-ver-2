@@ -111,7 +111,7 @@ class LibraryScreen : Screen {
                                 TextField(
                                     value = searchQuery,
                                     onValueChange = { screenModel.setSearchQuery(it) },
-                                    placeholder = { Text("TĂ¬m trong thÆ° viá»‡n...", color = Color.White.copy(alpha = 0.5f)) },
+                                    placeholder = { Text("Tìm trong thư viện...", color = Color.White.copy(alpha = 0.5f)) },
                                     colors = TextFieldDefaults.colors(
                                         focusedContainerColor = Color.Transparent,
                                         unfocusedContainerColor = Color.Transparent,
@@ -126,7 +126,7 @@ class LibraryScreen : Screen {
                                 )
                             } else {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("ThÆ° viá»‡n", color = Color.White, fontWeight = FontWeight.ExtraBold)
+                                    Text("Thư viện", color = Color.White, fontWeight = FontWeight.ExtraBold)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Surface(
                                         color = Color.White.copy(alpha = 0.1f),
@@ -155,13 +155,13 @@ class LibraryScreen : Screen {
                             )
                         }
                         IconButton(onClick = { showSettingsDialog = true }) {
-                            Icon(Icons.Default.Tune, contentDescription = "Bá»™ lá»c", tint = Color.White)
+                            Icon(Icons.Default.Tune, contentDescription = "Bộ lọc", tint = Color.White)
                         }
                         
                         var showMoreMenu by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "ThĂªm", tint = Color.White)
+                                Icon(Icons.Default.MoreVert, contentDescription = "Thêm", tint = Color.White)
                             }
                             DropdownMenu(
                                 expanded = showMoreMenu,
@@ -169,14 +169,14 @@ class LibraryScreen : Screen {
                                 containerColor = Color(0xFF2B2B2B)
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Cáº­p nháº­t thÆ° viá»‡n", color = Color.White) },
+                                    text = { Text("Cập nhật thư viện", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
                                         screenModel.refreshLibrary() // Global Update
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Cáº­p nháº­t danh má»¥c", color = Color.White) },
+                                    text = { Text("Cập nhật danh mục", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
                                         // Refresh current category only
@@ -184,7 +184,7 @@ class LibraryScreen : Screen {
                                     }
                                 )
                                  DropdownMenuItem(
-                                    text = { Text("Má»Ÿ truyá»‡n ngáº«u nhiĂªn", color = Color.White) },
+                                    text = { Text("Mở truyện ngẫu nhiên", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
                                         screenModel.getRandomManga()?.let { 
@@ -193,29 +193,29 @@ class LibraryScreen : Screen {
                                     }
                                 )
                                  DropdownMenuItem(
-                                    text = { Text("Chá»‰nh sá»­a danh má»¥c", color = Color.White) },
+                                    text = { Text("Chỉnh sửa danh mục", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
                                         rootNavigator.push(CategoryManagerScreen())
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Nháº­p tá»‡p truyá»‡n (EPUB, PDF, ZIP)", color = Color.White) },
+                                    text = { Text("Nhập tệp truyện (EPUB, PDF, ZIP)", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
-                                        // Chá»‰ cháº¥p nháº­n EPUB, PDF, ZIP, CBZ Ä‘á»ƒ trĂ¡nh import file khĂ´ng há»£p lá»‡
+                                        // Chỉ chấp nhận EPUB, PDF, ZIP, CBZ để tránh import file không hợp lệ
                                         importFileLauncher.launch(arrayOf(
                                             "application/epub+zip",
                                             "application/pdf",
                                             "application/zip",
                                             "application/x-cbz",
-                                            "application/octet-stream",  // Fallback cho file khĂ´ng cĂ³ MIME Ä‘Ăºng
-                                            "*/*"  // Giá»¯ láº¡i */* á»Ÿ cuá»‘i vĂ¬ má»™t sá»‘ file manager cáº§n
+                                            "application/octet-stream",  // Fallback cho file không có MIME đúng
+                                            "*/*"  // Giữ lại */* ở cuối vì một số file manager cần
                                         ))
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Nháº­p thÆ° má»¥c áº£nh (Folder)", color = Color.White) },
+                                    text = { Text("Nhập thư mục ảnh (Folder)", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
                                         importFolderLauncher.launch(null)
@@ -249,7 +249,7 @@ class LibraryScreen : Screen {
                     if (showCategoryDialog) {
                         AlertDialog(
                             onDismissRequest = { showCategoryDialog = false },
-                            title = { Text("ThĂªm vĂ o danh má»¥c", fontWeight = FontWeight.Bold) },
+                            title = { Text("Thêm vào danh mục", fontWeight = FontWeight.Bold) },
                             text = {
                                 LazyColumn {
                                     items(categories) { category ->
@@ -267,7 +267,7 @@ class LibraryScreen : Screen {
                             },
                             confirmButton = {
                                 TextButton(onClick = { showCategoryDialog = false }) {
-                                    Text("Há»§y", color = Color.Gray)
+                                    Text("Hủy", color = Color.Gray)
                                 }
                             },
                             containerColor = Color(0xFF2B2B2B),
@@ -365,7 +365,7 @@ fun LibraryContent(
     onMangaLongClick: (Long) -> Unit
 ) {
     if (mangaList.isEmpty()) {
-        EmptyState(Icons.Default.FavoriteBorder, "ThÆ° viá»‡n trá»‘ng", "HĂ£y thĂªm truyá»‡n yĂªu thĂ­ch Ä‘á»ƒ theo dĂµi táº¡i Ä‘Ă¢y.")
+        EmptyState(Icons.Default.FavoriteBorder, "Thư viện trống", "Hãy thêm truyện yêu thích để theo dõi tại đây.")
         return
     }
 
@@ -445,7 +445,7 @@ fun LibraryGridItem(
                 val animatedVisibilityScope = com.example.manga_readerver2.core.navigation.LocalNavAnimatedVisibilityScope.current
                 
                 AsyncImage(
-                    model = manga.thumbnailUrl,
+                    model = manga,
                     contentDescription = manga.title,
                     modifier = Modifier.fillMaxSize().let {
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
@@ -563,7 +563,7 @@ fun LibraryListItem(
             val animatedVisibilityScope = com.example.manga_readerver2.core.navigation.LocalNavAnimatedVisibilityScope.current
 
             AsyncImage(
-                model = manga.thumbnailUrl,
+                model = manga,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().let {
                     if (sharedTransitionScope != null && animatedVisibilityScope != null) {
@@ -581,7 +581,7 @@ fun LibraryListItem(
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(manga.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(manga.author ?: "KhĂ´ng rĂµ tĂ¡c giáº£", color = Color.Gray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(manga.author ?: "Không rõ tác giả", color = Color.Gray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -627,7 +627,7 @@ fun SelectionTopBar(
         modifier = Modifier.fillMaxWidth().statusBarsPadding()
     ) {
         TopAppBar(
-            title = { Text("$selectedCount Ä‘Ă£ chá»n", color = Color.White) },
+            title = { Text("$selectedCount đã chọn", color = Color.White) },
             navigationIcon = {
                 IconButton(onClick = onClose) {
                     Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
@@ -635,17 +635,17 @@ fun SelectionTopBar(
             },
             actions = {
                 IconButton(onClick = onSelectAll) {
-                    Icon(Icons.Default.SelectAll, contentDescription = "Chá»n táº¥t cáº£", tint = Color.White)
+                    Icon(Icons.Default.SelectAll, contentDescription = "Chọn tất cả", tint = Color.White)
                 }
                 IconButton(onClick = onUpdate) {
-                    Icon(Icons.Default.Sync, contentDescription = "Cáº­p nháº­t", tint = Color.White)
+                    Icon(Icons.Default.Sync, contentDescription = "Cập nhật", tint = Color.White)
                 }
                 IconButton(onClick = onUnfollow) {
-                    Icon(Icons.Default.Delete, contentDescription = "XĂ³a khá»i thÆ° viá»‡n", tint = Color.White)
+                    Icon(Icons.Default.Delete, contentDescription = "Xóa khỏi thư viện", tint = Color.White)
                 }
                 Box {
                     IconButton(onClick = { showMoreMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "ThĂªm", tint = Color.White)
+                        Icon(Icons.Default.MoreVert, contentDescription = "Thêm", tint = Color.White)
                     }
                     DropdownMenu(
                         expanded = showMoreMenu,
@@ -653,28 +653,28 @@ fun SelectionTopBar(
                         containerColor = Color(0xFF2B2B2B)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Äáº£o ngÆ°á»£c lá»±a chá»n", color = Color.White) },
+                            text = { Text("Đảo ngược lựa chọn", color = Color.White) },
                             onClick = {
                                 showMoreMenu = false
                                 onInvertSelection()
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("ÄĂ¡nh dáº¥u Ä‘Ă£ Ä‘á»c", color = Color.White) },
+                            text = { Text("Đánh dấu đã đọc", color = Color.White) },
                             onClick = {
                                 showMoreMenu = false
                                 onMarkRead(true)
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("ÄĂ¡nh dáº¥u chÆ°a Ä‘á»c", color = Color.White) },
+                            text = { Text("Đánh dấu chưa đọc", color = Color.White) },
                             onClick = {
                                 showMoreMenu = false
                                 onMarkRead(false)
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Chuyá»ƒn danh má»¥c", color = Color.White) },
+                            text = { Text("Chuyển danh mục", color = Color.White) },
                             onClick = {
                                 showMoreMenu = false
                                 onChangeCategory()

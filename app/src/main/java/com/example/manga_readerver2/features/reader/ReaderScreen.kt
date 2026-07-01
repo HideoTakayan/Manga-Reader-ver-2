@@ -1,4 +1,4 @@
-﻿@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.manga_readerver2.features.reader
 
 import android.app.Activity
@@ -118,38 +118,7 @@ fun ReaderMainContent(
     val isTtsPlaying by screenModel.isTtsPlaying.collectAsState()
     val keepScreenOn by screenModel.keepScreenOn.collectAsState()
     val brightness by screenModel.brightness.collectAsState()
-    val volumeKeyNavigation by screenModel.volumeKeyNavigation.collectAsState()
-
     val view = androidx.compose.ui.platform.LocalView.current
-    DisposableEffect(volumeKeyNavigation) {
-        if (volumeKeyNavigation) {
-            val focusRequester = view.findFocus() ?: view
-            focusRequester.isFocusableInTouchMode = true
-            focusRequester.requestFocus()
-            focusRequester.setOnKeyListener { _, keyCode, event ->
-                if (event.action == android.view.KeyEvent.ACTION_DOWN) {
-                    when (keyCode) {
-                        android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                            screenModel.setPage(currentPage + 1)
-                            true
-                        }
-                        android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
-                            screenModel.setPage(currentPage - 1)
-                            true
-                        }
-                        else -> false
-                    }
-                } else if (event.action == android.view.KeyEvent.ACTION_UP) {
-                    keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
-                } else false
-            }
-            onDispose {
-                focusRequester.setOnKeyListener(null)
-            }
-        } else {
-            onDispose {}
-        }
-    }
 
     LaunchedEffect(Unit) {
         // Initialization handled by loadChapter below
@@ -247,7 +216,7 @@ fun ReaderMainContent(
 
     // Horizontal swipe tracking
     var horizontalDragTotal by remember { mutableFloatStateOf(0f) }
-    val swipeThreshold = 80f // px Ä‘á»ƒ tĂ­nh lĂ  swipe chuyá»ƒn trang
+    val swipeThreshold = 80f // px để tính là swipe chuyển trang
 
     LaunchedEffect(mangaId, chapterId) {
         screenModel.loadChapter(mangaId, chapterId)
@@ -271,28 +240,6 @@ fun ReaderMainContent(
         }
     }
 
-    DisposableEffect(Unit) {
-        com.example.manga_readerver2.core.utils.VolumeKeyDispatcher.isReaderActive = true
-        onDispose {
-            com.example.manga_readerver2.core.utils.VolumeKeyDispatcher.isReaderActive = false
-        }
-    }
-
-    LaunchedEffect(readingMode, isTextReader) {
-        com.example.manga_readerver2.core.utils.VolumeKeyDispatcher.events.collect { event ->
-            if (isTextReader || readingMode == ReadingMode.VERTICAL || readingMode == ReadingMode.WEBTOON) {
-                val direction = if (event == com.example.manga_readerver2.core.utils.VolumeKeyDispatcher.VolumeEvent.DOWN) 1f else -1f
-                listState.animateScrollBy(direction * screenHeightPx * 0.8f)
-            } else {
-                if (event == com.example.manga_readerver2.core.utils.VolumeKeyDispatcher.VolumeEvent.DOWN) {
-                    screenModel.goToNextPage()
-                } else {
-                    screenModel.goToPrevPage()
-                }
-            }
-        }
-    }
-
     DisposableEffect(keepScreenOn) {
         val activity = context as? Activity
         if (keepScreenOn) activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -300,13 +247,41 @@ fun ReaderMainContent(
         onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
-    // handleTap: chá»‰ toggle controls khi nháº¥n vĂ o mĂ n hĂ¬nh
-    // Chuyá»ƒn trang/chÆ°Æ¡ng báº±ng vuá»‘t (swipe), khĂ´ng dĂ¹ng nháº¥n ná»¯a
-    val handleTap: (Float, Float, Float) -> Unit = { x, y, width ->
+    // handleTap: check custom 3x3 tap zones
+    val customTapZones by screenModel.customTapZones.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+
+    val handleTap: (Float, Float, Float, Float) -> Unit = { x, y, width, height ->
         if (isAutoScrolling) {
             isAutoScrolling = false
         } else {
-            showControls = !showControls
+            val col = (x / (width / 3)).toInt().coerceIn(0, 2)
+            val row = (y / (height / 3)).toInt().coerceIn(0, 2)
+            val index = row * 3 + col
+            val action = customTapZones.getOrNull(index) ?: com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.NONE
+
+            when (action) {
+                com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.NEXT -> {
+                    if (readingMode == ReadingMode.WEBTOON || readingMode == ReadingMode.VERTICAL) {
+                        coroutineScope.launch { listState.animateScrollBy(height * 0.8f) }
+                    } else {
+                        screenModel.goToNextPage()
+                    }
+                }
+                com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.PREVIOUS -> {
+                    if (readingMode == ReadingMode.WEBTOON || readingMode == ReadingMode.VERTICAL) {
+                        coroutineScope.launch { listState.animateScrollBy(-height * 0.8f) }
+                    } else {
+                        screenModel.goToPrevPage()
+                    }
+                }
+                com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.MENU -> {
+                    showControls = !showControls
+                }
+                com.example.manga_readerver2.core.preference.ReaderPreferences.TapAction.NONE -> {
+                    // Do nothing
+                }
+            }
         }
     }
     
@@ -327,15 +302,14 @@ fun ReaderMainContent(
             } else {
                 // Content Layer
                 if (isTextReader) {
-                    (allPages.firstOrNull() as? ReaderPage.Text)?.let { page ->
-                        com.example.manga_readerver2.features.reader.viewer.TextReaderViewer(
-                            content = page.content,
-                            screenModel = screenModel,
-                            listState = listState,
-                            textColor = textColor,
-                            onTap = handleTap
-                        )
-                    }
+                    val textBlocks by screenModel.textBlocks.collectAsState()
+                    com.example.manga_readerver2.features.reader.viewer.TextReaderViewer(
+                        blocks = textBlocks,
+                        screenModel = screenModel,
+                        listState = listState,
+                        textColor = textColor,
+                        onTap = handleTap
+                    )
                 } else if (readingMode == ReadingMode.RIGHT_TO_LEFT || readingMode == ReadingMode.LEFT_TO_RIGHT || readingMode == ReadingMode.VERTICAL) {
                     val cropBorders by screenModel.cropBorders.collectAsState()
                     com.example.manga_readerver2.features.reader.viewer.PagerViewer(
@@ -357,6 +331,24 @@ fun ReaderMainContent(
                             .fillMaxSize()
                             .transformable(state = transformableState)
                             .pointerInput(webtoonScale) {
+                                detectTapGestures(
+                                    onDoubleTap = { offset ->
+                                        if (webtoonScale > 1f) {
+                                            webtoonScale = 1f
+                                            webtoonOffset = Offset.Zero
+                                        } else {
+                                            webtoonScale = 2f
+                                            val maxX = (screenWidthPx * (webtoonScale - 1)) / 2
+                                            val maxY = (screenHeightPx * (webtoonScale - 1)) / 2
+                                            // Center the tapped point
+                                            val newX = (screenWidthPx / 2 - offset.x) * webtoonScale
+                                            val newY = (screenHeightPx / 2 - offset.y) * webtoonScale
+                                            webtoonOffset = Offset(newX.coerceIn(-maxX, maxX), newY.coerceIn(-maxY, maxY))
+                                        }
+                                    }
+                                )
+                            }
+                            .pointerInput(webtoonScale) {
                                 if (webtoonScale > 1f) {
                                     detectHorizontalDragGestures { change, dragAmount ->
                                         val maxX = (screenWidthPx * (webtoonScale - 1)) / 2
@@ -377,7 +369,7 @@ fun ReaderMainContent(
                                     translationY = webtoonOffset.y
                                 )
                                 .padding(horizontal = sidePaddingDp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            verticalArrangement = Arrangement.Top
                         ) {
                             itemsIndexed(
                                 items = allPages,
@@ -425,9 +417,9 @@ fun ReaderMainContent(
                     Column(modifier = Modifier.fillMaxWidth().background(CardBackground.copy(alpha = 0.95f)).clickable(onClick = {}, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }).navigationBarsPadding().padding(bottom = 16.dp)) {
                         if (!isTextReader) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("TrÆ°á»›c", color = TextSecondary, fontSize = 12.sp)
+                                Text("Trước", color = TextSecondary, fontSize = 12.sp)
                                 Slider(value = (currentPage + 1).toFloat(), onValueChange = { screenModel.setPage(it.toInt() - 1) }, valueRange = 1f..(pageCount.coerceAtLeast(1).toFloat()), modifier = Modifier.weight(1f).padding(horizontal = 8.dp), colors = SliderDefaults.colors(thumbColor = PrimaryOrange, activeTrackColor = PrimaryOrange))
-                                Text("Tiáº¿p", color = TextSecondary, fontSize = 12.sp)
+                                Text("Tiếp", color = TextSecondary, fontSize = 12.sp)
                             }
                         }
                         Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -437,14 +429,14 @@ fun ReaderMainContent(
                             IconButton(onClick = { screenModel.toggleChapterBookmark() }) {
                                 Icon(
                                     if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    contentDescription = "Bookmark chÆ°Æ¡ng",
+                                    contentDescription = "Bookmark chương",
                                     tint = if (isBookmarked) PrimaryOrange else Color.White
                                 )
                             }
                             IconButton(onClick = { screenModel.setOrientation((orientation + 1) % 3) }) { Icon(if (orientation == 1) Icons.Default.ScreenLockPortrait else if (orientation == 2) Icons.Default.ScreenLockLandscape else Icons.Default.ScreenRotation, null, tint = Color.White) }
                             if (!isTextReader) {
                                 IconButton(onClick = { isAutoScrolling = true; showControls = false }) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Tá»± Ä‘á»™ng cuá»™n/láº­t", tint = Color.White)
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Tự động cuộn/lật", tint = Color.White)
                                 }
                             }
                             IconButton(onClick = { showTtsPlayer = true }) { Icon(Icons.Default.Headphones, null, tint = if (isTtsPlaying) PrimaryOrange else Color.White) }
@@ -516,23 +508,23 @@ fun ReaderMainContent(
             if (longPressedPage != null) {
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { longPressedPage = null },
-                    title = { Text("TĂ¹y chá»n trang", color = Color.White) },
+                    title = { Text("Tùy chọn trang", color = Color.White) },
                     containerColor = CardBackground,
                     text = {
                         Column {
-                            androidx.compose.material3.TextButton(onClick = { /* TODO: Táº£i áº£nh */ longPressedPage = null }) {
-                                Text("Táº£i trang nĂ y", color = PrimaryOrange)
+                            androidx.compose.material3.TextButton(onClick = { /* TODO: Tải ảnh */ longPressedPage = null }) {
+                                Text("Tải trang này", color = PrimaryOrange)
                             }
-                            androidx.compose.material3.TextButton(onClick = { /* TODO: Chia sáº» */ longPressedPage = null }) {
-                                Text("Chia sáº»", color = PrimaryOrange)
+                            androidx.compose.material3.TextButton(onClick = { /* TODO: Chia sẻ */ longPressedPage = null }) {
+                                Text("Chia sẻ", color = PrimaryOrange)
                             }
-                            androidx.compose.material3.TextButton(onClick = { /* TODO: Äáº·t áº£nh bĂ¬a */ longPressedPage = null }) {
-                                Text("Äáº·t lĂ m áº£nh bĂ¬a", color = PrimaryOrange)
+                            androidx.compose.material3.TextButton(onClick = { /* TODO: Đặt ảnh bìa */ longPressedPage = null }) {
+                                Text("Đặt làm ảnh bìa", color = PrimaryOrange)
                             }
                         }
                     },
                     confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = { longPressedPage = null }) { Text("ÄĂ³ng", color = TextSecondary) }
+                        androidx.compose.material3.TextButton(onClick = { longPressedPage = null }) { Text("Đóng", color = TextSecondary) }
                     }
                 )
             }

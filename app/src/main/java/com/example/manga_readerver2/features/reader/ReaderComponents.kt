@@ -1,4 +1,4 @@
-﻿@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.manga_readerver2.features.reader
 
 import android.content.Context
@@ -54,7 +54,7 @@ fun ReaderDrawer(
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Text(
-                "Má»¥c lá»¥c",
+                "Mục lục",
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -100,7 +100,7 @@ fun PageImage(
     scaleMode: Int = 0,
     isWebtoon: Boolean = false,
     cropBorders: Boolean = false,
-    onTap: ((Float, Float, Float) -> Unit)? = null,
+    onTap: ((Float, Float, Float, Float) -> Unit)? = null,
     onLongPress: ((ReaderPage) -> Unit)? = null
 ) {
     val currentOnTap = rememberUpdatedState(onTap)
@@ -124,7 +124,7 @@ fun PageImage(
         }
     }
 
-    // Náº¿u cropBorders báº­t: decode bitmap vĂ  crop viá»n tráº¯ng
+    // Nếu cropBorders bật: decode bitmap và crop viền trắng
     var displayModel by remember { mutableStateOf<Any?>(null) }
     LaunchedEffect(model, cropBorders) {
         if (!cropBorders || model == null) {
@@ -140,14 +140,64 @@ fun PageImage(
                         .cropBorders(m)
                     else -> null
                 }
-                cropped ?: model // Fallback vá» áº£nh gá»‘c náº¿u khĂ´ng crop Ä‘Æ°á»£c
+                cropped ?: model // Fallback về ảnh gốc nếu không crop được
             } catch (e: Exception) {
                 model // Fallback
             }
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    // Tính aspect ratio cho Webtoon mode để xếp ảnh khít nhau
+    var webtoonAspectRatio by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(displayModel) {
+        if (displayModel != null) {
+            webtoonAspectRatio = withContext(Dispatchers.IO) {
+                try {
+                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    val ratio = when (val m = displayModel) {
+                        is String -> {
+                            android.graphics.BitmapFactory.decodeFile(m, options)
+                            if (options.outWidth > 0 && options.outHeight > 0) {
+                                options.outWidth.toFloat() / options.outHeight.toFloat()
+                            } else null
+                        }
+                        is ByteArray -> {
+                            android.graphics.BitmapFactory.decodeByteArray(m, 0, m.size, options)
+                            if (options.outWidth > 0 && options.outHeight > 0) {
+                                options.outWidth.toFloat() / options.outHeight.toFloat()
+                            } else null
+                        }
+                        is android.graphics.Bitmap -> m.width.toFloat() / m.height.toFloat()
+                        else -> null
+                    }
+                    
+                    // Auto-detect Webtoon based on aspect ratio if currently not in Webtoon mode
+                    if (!isWebtoon && ratio != null && ratio < 0.5f) {
+                        withContext(Dispatchers.Main) {
+                            screenModel.setReadingModeTemp(ReadingMode.WEBTOON)
+                        }
+                    }
+                    
+                    ratio
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+    }
+
+    // Wrap with Box that respects aspect ratio for Webtoon, else fillMax
+    val containerModifier = if (isWebtoon) {
+        if (webtoonAspectRatio != null) {
+            Modifier.fillMaxWidth().aspectRatio(webtoonAspectRatio!!)
+        } else {
+            Modifier.fillMaxWidth().wrapContentHeight() // Fallback before ratio is calculated
+        }
+    } else {
+        Modifier.fillMaxSize()
+    }
+
+    Box(modifier = containerModifier, contentAlignment = Alignment.Center) {
         when {
             page is ReaderPage.Online && page.isLoading -> {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,11 +208,11 @@ fun PageImage(
             displayModel != null -> {
                 com.example.manga_readerver2.features.reader.components.SubsamplingImage(
                     displayModel!!,
-                    modifier = if (isWebtoon) Modifier.fillMaxWidth().wrapContentHeight() else Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     scaleMode = if (isWebtoon) 1 else scaleMode,
                     isWebtoon = isWebtoon,
-                    onTap = { x, y, w ->
-                        currentOnTap.value?.invoke(x, y, w)
+                    onTap = { x, y, w, h ->
+                        currentOnTap.value?.invoke(x, y, w, h)
                     },
                     onLongPress = {
                         page?.let { currentOnLongPress.value?.invoke(it) }
@@ -171,13 +221,13 @@ fun PageImage(
             }
             page is ReaderPage.Online && page.hasError -> {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.BrokenImage, contentDescription = "Lá»—i", tint = Color.Gray, modifier = Modifier.size(48.dp))
-                    Text("Táº£i áº£nh tháº¥t báº¡i", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp)
+                    Icon(Icons.Default.BrokenImage, contentDescription = "Lỗi", tint = Color.Gray, modifier = Modifier.size(48.dp))
+                    Text("Tải ảnh thất bại", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp)
                     Button(
                         onClick = { screenModel.loadPage(page.index) },
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
                     ) {
-                        Text("Thá»­ láº¡i", color = Color.White)
+                        Text("Thử lại", color = Color.White)
                     }
                 }
             }
@@ -187,7 +237,7 @@ fun PageImage(
                     if (page is ReaderPage.Archive) {
                         Text(page.entryName.substringAfterLast('/'), color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
                     } else if (page is ReaderPage.Online) {
-                        Text("Äang chá» táº£i...", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+                        Text("Đang chờ tải...", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
                     }
                 }
             }
@@ -203,7 +253,7 @@ fun ReaderPageContent(
     scaleMode: Int = 0,
     isWebtoon: Boolean = false,
     textColor: Color = Color.White,
-    onTap: ((Float, Float, Float) -> Unit)? = null,
+    onTap: ((Float, Float, Float, Float) -> Unit)? = null,
     listState: androidx.compose.foundation.lazy.LazyListState? = null
 ) {
     val currentOnTap = rememberUpdatedState(onTap)
@@ -211,10 +261,11 @@ fun ReaderPageContent(
     if (page is ReaderPage.Text) {
         Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
             detectTapGestures { offset ->
-                currentOnTap.value?.invoke(offset.x, offset.y, size.width.toFloat())
+                currentOnTap.value?.invoke(offset.x, offset.y, size.width.toFloat(), size.height.toFloat())
             }
         }) {
-            TextReaderContent(page.content, listState = listState, screenModel = screenModel, textColor = textColor)
+            // TextReaderContent has been replaced by TextReaderViewer and should not be used in Pager/Webtoon mode
+            Text("Lỗi: Text reader content cannot be rendered here.", color = textColor)
         }
     } else {
         PageImage(page, screenModel, scaleMode, isWebtoon, cropBorders, onTap)
@@ -222,123 +273,39 @@ fun ReaderPageContent(
 }
 
 @Composable
-fun ChapterTransitionPage(screenModel: ReaderScreenModel) {
+fun ChapterTransitionPage(screenModel: ReaderScreenModel, transition: ReaderPage.Transition? = null) {
     val chapters by screenModel.chapters.collectAsState()
-    val currentChapterId = screenModel.currentChapter?.id ?: 0L
-    // Sort tÄƒng dáº§n theo sá»‘ chÆ°Æ¡ng â€” giá»‘ng Mihon dĂ¹ng sortDescending=false
-    // Index+1 = chÆ°Æ¡ng cĂ³ sá»‘ lá»›n hÆ¡n = chÆ°Æ¡ng tiáº¿p theo cáº§n Ä‘á»c
+    val currentChapterId = transition?.chapter?.id ?: screenModel.currentChapter?.id ?: 0L
+    // Sort tăng dần theo số chương (giống Mihon dùng sortDescending=false)
+    // Index+1 = chương có số lớn hơn = chương tiếp theo cần đọc
     val sortedAsc = remember(chapters) { chapters.sortedBy { it.chapterNumber } }
     val currentIndex = sortedAsc.indexOfFirst { it.id == currentChapterId }
-    val nextChapter = if (currentIndex >= 0) sortedAsc.getOrNull(currentIndex + 1) else null
+    val nextChapter = transition?.nextChapter ?: (if (currentIndex >= 0) sortedAsc.getOrNull(currentIndex + 1) else null)
 
-    LaunchedEffect(nextChapter) {
-        if (nextChapter != null) {
-            delay(1000) // Äá»£i 1 giĂ¢y Ä‘á»ƒ ngÆ°á»i dĂ¹ng tháº¥y thĂ´ng bĂ¡o
-            screenModel.navigateToChapter(nextChapter)
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black).padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("ÄĂ£ háº¿t chÆ°Æ¡ng hiá»‡n táº¡i", color = Color.White.copy(alpha = 0.6f), fontSize = 16.sp)
+            Text("Đã hết chương hiện tại", color = Color.White.copy(alpha = 0.6f), fontSize = 16.sp)
             Spacer(modifier = Modifier.height(16.dp))
             if (nextChapter != null) {
-                Text("Äang táº£i: ${nextChapter.name}...", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text("Chương tiếp theo: ${nextChapter.name}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(24.dp))
-                CircularProgressIndicator(color = PrimaryOrange)
-            } else {
-                Text("ÄĂ¢y lĂ  chÆ°Æ¡ng cuá»‘i cĂ¹ng", color = PrimaryOrange, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-fun TextReaderContent(
-    content: String,
-    listState: androidx.compose.foundation.lazy.LazyListState? = null,
-    screenModel: ReaderScreenModel? = null,
-    textColor: Color = Color.White
-) {
-    val paragraphs = remember(content) { content.split("\n").filter { it.isNotBlank() } }
-    val currentTtsParagraph by (screenModel?.currentTtsParagraph?.collectAsState() ?: mutableStateOf(-1))
-    
-    LaunchedEffect(paragraphs.size) {
-        screenModel?.setTextPageCount(paragraphs.size)
-    }
-
-    // Auto-scroll to active TTS paragraph
-    LaunchedEffect(currentTtsParagraph) {
-        if (currentTtsParagraph >= 0 && listState != null) {
-            // Chá»‰ cuá»™n náº¿u paragraph Ä‘ang Ä‘á»c khĂ´ng náº±m trong view hiá»‡n táº¡i
-            val visibleItems = listState.layoutInfo.visibleItemsInfo
-            val isVisible = visibleItems.any { it.index == currentTtsParagraph }
-            if (!isVisible) {
-                listState.animateScrollToItem(currentTtsParagraph)
-            }
-        }
-    }
-    
-    val fontSize = screenModel?.fontSize?.collectAsState()?.value ?: 18f
-    val lineSpacing = screenModel?.lineSpacing?.collectAsState()?.value ?: 1.2f
-    val modifier = if (listState != null) Modifier.fillMaxSize().padding(horizontal = 20.dp) else Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState())
-    
-    if (listState != null) {
-        LazyColumn(
-            state = listState, 
-            modifier = modifier, 
-            contentPadding = PaddingValues(top = 24.dp, bottom = 48.dp, start = 16.dp, end = 16.dp)
-        ) {
-            itemsIndexed(paragraphs) { index, paragraph ->
-                val isActive = index == currentTtsParagraph
-                val backgroundColor = if (isActive) PrimaryOrange.copy(alpha = 0.15f) else Color.Transparent
-                
-                Surface(
-                    color = backgroundColor,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                // Because we have continuous scrolling, we don't strictly need the button anymore,
+                // but we can keep it for users who want to jump to the start of the next chapter explicitly.
+                Button(
+                    onClick = { screenModel.navigateToChapter(nextChapter) },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrange)
                 ) {
-                    Text(
-                        paragraph, 
-                        color = if (isActive) PrimaryOrange else textColor.copy(alpha = 0.9f), 
-                        fontSize = fontSize.sp, 
-                        lineHeight = fontSize.sp * lineSpacing, 
-                        textAlign = TextAlign.Justify, 
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                    )
+                    Text("Tới chương tiếp", color = Color.White, fontWeight = FontWeight.Bold)
                 }
-            }
-            if (screenModel != null) {
-                item {
-                    ChapterTransitionPage(screenModel)
-                }
-            }
-        }
-    } else {
-        Column(modifier = modifier) {
-            paragraphs.forEachIndexed { index, paragraph ->
-                val isActive = index == currentTtsParagraph
-                Text(
-                    paragraph, 
-                    color = if (isActive) PrimaryOrange else textColor.copy(alpha = 0.9f), 
-                    fontSize = fontSize.sp, 
-                    lineHeight = fontSize.sp * lineSpacing, 
-                    textAlign = TextAlign.Justify, 
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = (fontSize * (lineSpacing - 1f) / 2).dp)
-                        .background(if (isActive) PrimaryOrange.copy(alpha = 0.1f) else Color.Transparent)
-                )
-            }
-            if (screenModel != null) {
-                ChapterTransitionPage(screenModel)
+            } else {
+                Text("Đây là chương cuối cùng", color = PrimaryOrange, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderTopBar(
     title: String,
@@ -348,18 +315,36 @@ fun ReaderTopBar(
     onTtsClick: (() -> Unit)? = null,
     isIncognito: Boolean = false
 ) {
-    Surface(color = Color.Black.copy(alpha = 0.8f), modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
-            Text(title, color = Color.White, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    androidx.compose.material3.TopAppBar(
+        title = { 
+            Text(
+                title, 
+                color = Color.White, 
+                fontWeight = FontWeight.Bold, 
+                maxLines = 1, 
+                overflow = TextOverflow.Ellipsis
+            ) 
+        },
+        navigationIcon = {
+            IconButton(onClick = onBackClick) { 
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) 
+            }
+        },
+        actions = {
             if (isIncognito) {
                 Icon(Icons.Default.VisibilityOff, contentDescription = "Incognito", tint = Color.Gray, modifier = Modifier.padding(end = 8.dp))
             }
             IconButton(onClick = onTocClick) { Icon(Icons.Default.FormatListBulleted, null, tint = Color.White) }
-            onTtsClick?.let { IconButton(onClick = it) { Icon(Icons.Default.Headphones, null, tint = Color.White) } }
+            if (onTtsClick != null) {
+                IconButton(onClick = onTtsClick) { Icon(Icons.Default.Headphones, null, tint = Color.White) }
+            }
             IconButton(onClick = onSettingsClick) { Icon(Icons.Default.Tune, null, tint = Color.White) }
-        }
-    }
+        },
+        colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Black.copy(alpha = 0.8f)
+        ),
+        windowInsets = androidx.compose.foundation.layout.WindowInsets.statusBars
+    )
 }
 
 @Composable
@@ -369,10 +354,10 @@ fun ReaderSystemOverlay(modifier: Modifier = Modifier) {
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         while(true) {
-            // Fix: DĂ¹ng BatteryManager API thay vĂ¬ registerReceiver Ä‘á»ƒ trĂ¡nh SecurityException trĂªn Android 13+
+            // Fix: Dùng BatteryManager API thay vì registerReceiver để tránh SecurityException trên Android 13+
             val batteryManager = context.getSystemService(android.content.Context.BATTERY_SERVICE) as? android.os.BatteryManager
             batteryPercent = batteryManager?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: run {
-                // Fallback cho cĂ¡c thiáº¿t bá»‹ cÅ© khĂ´ng há»— trá»£ getIntProperty
+                // Fallback cho các thiết bị cũ không hỗ trợ getIntProperty
                 val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 intent?.let { it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / it.getIntExtra(BatteryManager.EXTRA_SCALE, -1) } ?: 0
             }

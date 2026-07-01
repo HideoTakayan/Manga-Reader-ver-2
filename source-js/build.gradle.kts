@@ -36,6 +36,8 @@ dependencies {
     implementation(libs.logcat)
     implementation(libs.okhttp)
     implementation(libs.jsoup)
+    
+    testImplementation(libs.junit)
 }
 
 
