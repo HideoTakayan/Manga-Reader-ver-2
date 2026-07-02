@@ -71,7 +71,8 @@ WHERE _id = ? AND (thumbnail_url IS NULL OR thumbnail_url = '');
 
 updateMangaFavorite:
 UPDATE manga SET
-    favorite = ?
+    favorite = ?,
+    date_added = ?
 WHERE _id = ?;
 
 deleteManga:

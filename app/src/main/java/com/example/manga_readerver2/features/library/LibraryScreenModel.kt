@@ -158,11 +158,21 @@ class LibraryScreenModel(
         _selectedMangaIds.value = emptySet()
     }
 
-    fun bulkUnfollow() {
+    fun bulkUnfollow(deleteDownloads: Boolean = false) {
         val ids = _selectedMangaIds.value
-        screenModelScope.launch {
+        screenModelScope.launch(Dispatchers.IO) {
             ids.forEach { id ->
                 mangaRepository.updateMangaFavorite(id, false)
+                
+                if (deleteDownloads) {
+                    val manga = mangaRepository.getMangaById(id)
+                    if (manga != null) {
+                        val sourceName = sourceManager.get(manga.source)?.name ?: manga.source.toString()
+                        fileManager.deleteManga(sourceName, manga.title, manga.id.toString())
+                        val downloadCache = Injekt.get<com.example.manga_readerver2.core.download.DownloadCache>()
+                        downloadCache.removeManga(manga.id)
+                    }
+                }
             }
             clearSelection()
         }
@@ -274,7 +284,7 @@ class LibraryScreenModel(
     }
 
     private suspend fun updateMangaFromSource(manga: Manga) {
-        val source = sourceManager.get(manga.source) as? eu.kanade.tachiyomi.source.CatalogueSource ?: return
+        val source = sourceManager.get(manga.source) ?: return
         val sManga = eu.kanade.tachiyomi.source.model.SManga.create().apply {
             url = manga.url
             title = manga.title
@@ -282,41 +292,37 @@ class LibraryScreenModel(
         }
         
         try {
-            // 1. Cập nhật chi tiết truyện
-            val networkManga = withContext(Dispatchers.IO) { source.getMangaDetails(sManga) }
-            val updatedManga = manga.copy(
-                author = networkManga.author ?: manga.author,
-                artist = networkManga.artist ?: manga.artist,
-                description = networkManga.description ?: manga.description,
-                genre = networkManga.genre?.split(", ")?.filter { it.isNotBlank() } ?: manga.genre,
-                status = networkManga.status.toLong(),
-                initialized = true,
-                lastUpdate = System.currentTimeMillis()
-            )
-            mangaRepository.updateMangaDetails(updatedManga)
+            // Không fetch lại chi tiết truyện (MangaDetails) để tăng tốc và tránh lỗi mạng,
+            // chỉ tập trung lấy danh sách chương (ChapterList) như ý định của người dùng.
 
-            // 2. Cập nhật danh sách chương
             val networkChapters = withContext(Dispatchers.IO) {
                 source.getChapterList(sManga)
             }
             
-            val chapters = networkChapters.map { nc ->
-                com.example.manga_readerver2.domain.model.Chapter(
-                    id = 0,
-                    mangaId = manga.id,
-                    url = nc.url,
-                    name = nc.name,
-                    scanlator = nc.scanlator,
-                    read = false,
-                    bookmark = false,
-                    lastPageRead = 0,
-                    dateFetch = System.currentTimeMillis(),
-                    dateUpload = nc.date_upload,
-                    chapterNumber = nc.chapter_number,
-                    sourceOrder = 0L // nc.source_order not available in SChapter
-                )
-            }
-            if (chapters.isNotEmpty()) {
+            val existingChapters = mangaRepository.getChaptersByMangaId(manga.id)
+            val existingUrls = existingChapters.map { it.url }.toSet()
+
+            val newChapters = networkChapters.filter { it.url !in existingUrls }
+            
+            if (newChapters.isNotEmpty()) {
+                val chapters = newChapters.mapIndexed { index, nc ->
+                    com.example.manga_readerver2.domain.model.Chapter(
+                        id = 0,
+                        mangaId = manga.id,
+                        url = nc.url,
+                        name = nc.name,
+                        scanlator = nc.scanlator,
+                        read = false,
+                        bookmark = false,
+                        lastPageRead = 0,
+                        dateFetch = System.currentTimeMillis(),
+                        dateUpload = nc.date_upload,
+                        chapterNumber = nc.chapter_number,
+                        // Quan trọng: Gán sourceOrder để giữ đúng thứ tự khi MangaDetailScreen lấy danh sách.
+                        // MangaDetailScreen dùng fallback sort theo sourceOrder/dateUpload khi chapterNumber = -1
+                        sourceOrder = (networkChapters.size - index).toLong() 
+                    )
+                }
                 mangaRepository.insertChapters(chapters)
             }
         } catch (e: Exception) {

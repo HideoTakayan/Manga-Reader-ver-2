@@ -428,16 +428,34 @@ class JsSource(
     // ─── getPopularManga ──────────────────────────────────────────────────────
 
     override suspend fun getPopularManga(page: Int): MangasPage {
-        return fetchMangaListFromHome(page, tabIndex = 0)
+        return fetchMangaListFromHome(page, isLatest = false)
     }
 
     override suspend fun getLatestUpdates(page: Int): MangasPage {
-        // Thử dùng tab thứ 2 (thường là "Mới cập nhật"), fallback tab đầu
-        val result = fetchMangaListFromHome(page, tabIndex = 1)
-        return if (result.mangas.isEmpty()) fetchMangaListFromHome(page, tabIndex = 0) else result
+        // Thử dùng script "latest" riêng nếu extension có
+        val latestScript = scripts["latest"]
+        if (latestScript != null) {
+            return try {
+                val result = engine.execute(latestScript, "execute", page.toString())
+                    ?: return MangasPage(emptyList(), false)
+                val jsonResult = json.parseToJsonElement(result).jsonObject
+                val mangasJson = jsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
+                val hasNext = jsonResult["next"].let {
+                    it != null && it !is JsonNull && it.stringValue()?.isNotBlank() == true
+                }
+                val mangas = mangasJson.mapNotNull { (it as? JsonObject)?.let(::buildMangaFromJson) }
+                MangasPage(mangas, hasNext)
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR) { "[JsSource:$name] getLatestUpdates (latest.js) error: ${e.message}" }
+                MangasPage(emptyList(), false)
+            }
+        }
+
+        // Fallback: gọi home.js với isLatest = true
+        return fetchMangaListFromHome(page, isLatest = true)
     }
 
-    private suspend fun fetchMangaListFromHome(page: Int, tabIndex: Int): MangasPage {
+    private suspend fun fetchMangaListFromHome(page: Int, isLatest: Boolean): MangasPage {
         val script = scripts["home"] ?: return MangasPage(emptyList(), false)
         val homeResult = engine.execute(script, "execute", page.toString())
             ?: return MangasPage(emptyList(), false)
@@ -447,34 +465,63 @@ class JsSource(
             val data = jsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
             if (data.isEmpty()) return MangasPage(emptyList(), false)
 
-            val tabToUse = (data.getOrNull(tabIndex) ?: data[0]) as? JsonObject
-                ?: return MangasPage(emptyList(), false)
+            // Kiểm tra phần tử đầu tiên để biết data là mảng Tab hay mảng Manga
+            val firstItem = data.getOrNull(0) as? JsonObject ?: return MangasPage(emptyList(), false)
+            val isManga = firstItem.containsKey("cover") || firstItem.containsKey("img") || firstItem.containsKey("thumbnail") || (firstItem.containsKey("name") && firstItem.containsKey("host"))
 
-            val tabInput = tabToUse["input"]?.stringValue()
-            val tabScriptName = tabToUse["script"]?.stringValue()
-
-            if (tabInput != null && tabScriptName != null) {
-                // Tìm script theo tên file (bỏ extension .js nếu có)
-                val scriptKey = tabScriptName.substringBeforeLast(".")
-                val tabScript = scripts[scriptKey] ?: scripts["gen"] ?: return MangasPage(emptyList(), false)
-                val tabResult = engine.execute(tabScript, "execute", tabInput, page.toString())
-                    ?: return MangasPage(emptyList(), false)
-
-                val tabJsonResult = json.parseToJsonElement(tabResult).jsonObject
-                val mangasJson = tabJsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
-                val hasNext = tabJsonResult["next"].let {
-                    it != null && it !is JsonNull && it.stringValue()?.isNotBlank() == true
+            if (!isManga) {
+                // Đây là một mảng Tab objects
+                var tabIndex = if (isLatest) 1 else 0
+                
+                if (isLatest) {
+                    // Tìm tab "Mới cập nhật" dựa trên title để tránh fix cứng index 1
+                    for (i in 0 until data.size) {
+                        val tabObj = data[i] as? JsonObject ?: continue
+                        val title = tabObj["title"]?.stringValue()?.lowercase() ?: tabObj["name"]?.stringValue()?.lowercase() ?: ""
+                        if (title.contains("mới") || title.contains("cập nhật") || title.contains("latest") || title.contains("update")) {
+                            tabIndex = i
+                            break
+                        }
+                    }
                 }
-                val mangas = mangasJson.mapNotNull { (it as? JsonObject)?.let(::buildMangaFromJson) }
-                MangasPage(mangas, hasNext)
-            } else {
-                // home.js trả về danh sách manga trực tiếp (không có tab)
-                val mangas = data.mapNotNull { (it as? JsonObject)?.let(::buildMangaFromJson) }
-                val hasNext = jsonResult["next"].let {
-                    it != null && it !is JsonNull && it.stringValue()?.isNotBlank() == true
+                
+                val tabToUse = data.getOrNull(tabIndex) as? JsonObject
+                    ?: run {
+                        logcat(LogPriority.WARN) { "[JsSource:$name] tabIndex=$tabIndex không tồn tại (data.size=${data.size}), trả về rỗng" }
+                        return MangasPage(emptyList(), false)
+                    }
+
+                val tabInput = tabToUse["input"]?.stringValue() ?: tabToUse["url"]?.stringValue() ?: tabToUse["link"]?.stringValue()
+                val tabScriptName = tabToUse["script"]?.stringValue() ?: "gen"
+
+                if (tabInput != null) {
+                    val scriptKey = tabScriptName.substringBeforeLast(".")
+                    val tabScript = scripts[scriptKey] ?: scripts["gen"] ?: return MangasPage(emptyList(), false)
+                    val tabResult = engine.execute(tabScript, "execute", tabInput, page.toString())
+                        ?: return MangasPage(emptyList(), false)
+
+                    val tabJsonResult = json.parseToJsonElement(tabResult).jsonObject
+                    val mangasJson = tabJsonResult["data"]?.asJsonArray() ?: return MangasPage(emptyList(), false)
+                    val hasNext = tabJsonResult["next"].let {
+                        it != null && it !is JsonNull && it.stringValue()?.isNotBlank() == true
+                    }
+                    val mangas = mangasJson.mapNotNull { (it as? JsonObject)?.let(::buildMangaFromJson) }
+                    return MangasPage(mangas, hasNext)
                 }
-                MangasPage(mangas, hasNext)
+                return MangasPage(emptyList(), false)
             }
+            
+            // Nếu home.js trả về danh sách manga trực tiếp (không có tab)
+            if (isLatest) {
+                // Trả về rỗng để tránh việc 2 tab hiện cùng 1 dữ liệu giống nhau
+                return MangasPage(emptyList(), false)
+            }
+
+            val mangas = data.mapNotNull { (it as? JsonObject)?.let(::buildMangaFromJson) }
+            val hasNext = jsonResult["next"].let {
+                it != null && it !is JsonNull && it.stringValue()?.isNotBlank() == true
+            }
+            MangasPage(mangas, hasNext)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR) { "[JsSource:$name] fetchMangaListFromHome error: ${e.message}" }
             MangasPage(emptyList(), false)

@@ -55,9 +55,11 @@ class BrowseScreenModel(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing = _isRefreshing.asStateFlow()
 
-    // Flow cho danh sách nguồn đã ghim
     val pinnedSources = sourcePreferences.pinnedSources.asFlow()
         .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), sourcePreferences.pinnedSources.get())
+
+    val hiddenSources = sourcePreferences.hiddenSources.asFlow()
+        .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), sourcePreferences.hiddenSources.get())
 
     val enabledLanguages = sourcePreferences.enabledLanguages.asFlow()
         .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), sourcePreferences.enabledLanguages.get())
@@ -149,6 +151,16 @@ class BrowseScreenModel(
             currentPinned + sourceId.toString()
         }
         sourcePreferences.pinnedSources.set(newPinned)
+    }
+
+    fun toggleHide(sourceId: Long) {
+        val currentHidden = sourcePreferences.hiddenSources.get()
+        val newHidden = if (currentHidden.contains(sourceId.toString())) {
+            currentHidden - sourceId.toString()
+        } else {
+            currentHidden + sourceId.toString()
+        }
+        sourcePreferences.hiddenSources.set(newHidden)
     }
 
     fun trustExtension(extension: Extension.Untrusted) {

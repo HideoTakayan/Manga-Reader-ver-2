@@ -1,4 +1,4 @@
-﻿package com.example.manga_readerver2.features.settings
+package com.example.manga_readerver2.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -149,21 +149,15 @@ class SettingsScreen : Screen {
                 )
 
                 MoreItem(
-                    icon = Icons.Outlined.VolunteerActivism,
-                    title = "Ủng hộ chúng tôi",
-                    onClick = { uriHandler.openUri("https://github.com/Darkrai9x") }
-                )
-                
-                MoreItem(
                     icon = Icons.Outlined.Info,
-                    title = "Thông tin",
-                    onClick = { /* Hiển thị dialog thông tin hoặc trang web */ }
+                    title = "Hướng dẫn",
+                    onClick = { rootNavigator.push(GuideScreen()) }
                 )
 
                 MoreItem(
                     icon = Icons.Outlined.HelpOutline,
                     title = "Trợ giúp",
-                    onClick = { uriHandler.openUri("https://mihon.app/docs") }
+                    onClick = { uriHandler.openUri("https://www.facebook.com/minh.hieu.126210/") }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))

@@ -48,6 +48,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import com.example.manga_readerver2.source_js.JsSource
+import eu.kanade.tachiyomi.source.Source
+import eu.kanade.tachiyomi.source.CatalogueSource
 
 fun isJsExtension(ext: Extension): Boolean {
     return when (ext) {
@@ -72,6 +74,7 @@ class BrowseScreen : Screen {
         val installSteps by screenModel.installSteps.collectAsState()
         val isRefreshing by screenModel.isRefreshing.collectAsState()
         val pinnedSources by screenModel.pinnedSources.collectAsState()
+        val hiddenSources by screenModel.hiddenSources.collectAsState()
         val enabledLangs by screenModel.enabledLanguages.collectAsState()
 
         var selectedTab by remember { mutableIntStateOf(0) }
@@ -259,8 +262,10 @@ class BrowseScreen : Screen {
                             installedExts, 
                             contentTypeFilter, 
                             pinnedSources,
+                            hiddenSources,
                             enabledLangs,
-                            onTogglePin = { screenModel.togglePin(it) }
+                            onTogglePin = { screenModel.togglePin(it) },
+                            onToggleHide = { screenModel.toggleHide(it) }
                         )
                         1 -> ExtensionsTab(
                             installedExts, 
@@ -400,8 +405,10 @@ fun SourcesTab(
     extensions: List<Extension.Installed>, 
     filter: Int,
     pinnedSources: Set<String>,
+    hiddenSources: Set<String>,
     enabledLangs: Set<String>,
-    onTogglePin: (Long) -> Unit
+    onTogglePin: (Long) -> Unit,
+    onToggleHide: (Long) -> Unit
 ) {
     fun normalizeLang(code: String?): String {
         if (code.isNullOrBlank()) return "all"
@@ -456,11 +463,12 @@ fun SourcesTab(
     }
 
     val allSources = sourceWithExt.filter { (source, ext) ->
-        matchType(ext) && matchLang(source)
+        matchType(ext) && matchLang(source) && !hiddenSources.contains(source.id.toString())
     }
 
     val hiddenByTypeCount = sourceWithExt.count { (_, ext) -> !matchType(ext) }
     val hiddenByLanguageCount = sourceWithExt.count { (source, ext) -> matchType(ext) && !matchLang(source) }
+    val hiddenByUserCount = sourceWithExt.count { (source, _) -> hiddenSources.contains(source.id.toString()) }
 
     val pinnedList = allSources.filter { pinnedSources.contains(it.first.id.toString()) }
     val unpinnedGrouped = allSources
@@ -472,11 +480,12 @@ fun SourcesTab(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Chưa có nguồn nào phù hợp", color = Color.Gray)
-                if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0) {
+                if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0 || hiddenByUserCount > 0) {
                     Spacer(modifier = Modifier.height(6.dp))
                     val reasons = buildList {
-                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount nguồn bị ẩn theo ngôn ngữ")
-                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount nguồn bị ẩn theo loại nội dung")
+                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount bị ẩn do ngôn ngữ")
+                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount bị ẩn do loại")
+                        if (hiddenByUserCount > 0) add("$hiddenByUserCount bị ẩn bởi bạn")
                     }.joinToString(" • ")
                     Text(
                         text = reasons,
@@ -491,11 +500,12 @@ fun SourcesTab(
             contentPadding = PaddingValues(bottom = 16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0) {
+            if (hiddenByTypeCount > 0 || hiddenByLanguageCount > 0 || hiddenByUserCount > 0) {
                 item(key = "hidden_hint") {
                     val reasons = buildList {
-                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount bị ẩn theo ngôn ngữ")
-                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount bị ẩn theo loại nội dung")
+                        if (hiddenByLanguageCount > 0) add("$hiddenByLanguageCount bị ẩn do ngôn ngữ")
+                        if (hiddenByTypeCount > 0) add("$hiddenByTypeCount bị ẩn do loại")
+                        if (hiddenByUserCount > 0) add("$hiddenByUserCount bị ẩn bởi bạn")
                     }.joinToString(" • ")
                     Text(
                         text = "Đang ẩn: $reasons",
@@ -516,7 +526,7 @@ fun SourcesTab(
                     )
                 }
                 items(pinnedList, key = { "pinned_${it.first.id}_${it.second.pkgName}_${it.first.name}" }) { (source, ext) ->
-                    SourceItem(navigator, source, ext, true, onTogglePin)
+                    SourceItem(navigator, source, ext, true, onTogglePin, onToggleHide)
                 }
             }
 
@@ -538,28 +548,51 @@ fun SourcesTab(
                 }
 
                 items(sources, key = { "source_${it.first.id}_${it.second.pkgName}_${it.first.name}" }) { (source, ext) ->
-                    SourceItem(navigator, source, ext, false, onTogglePin)
+                    SourceItem(navigator, source, ext, false, onTogglePin, onToggleHide)
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SourceItem(
     navigator: cafe.adriel.voyager.navigator.Navigator,
     source: eu.kanade.tachiyomi.source.Source,
     ext: Extension.Installed,
     isPinned: Boolean,
-    onTogglePin: (Long) -> Unit
+    onTogglePin: (Long) -> Unit,
+    onToggleHide: (Long) -> Unit
 ) {
     val isJsSource = isJsExtension(ext)
     val isLocal = ext.pkgName == "local.source"
     
+    var showOptions by remember { mutableStateOf(false) }
+
+    if (showOptions) {
+        SourceOptionsDialog(
+            sourceName = source.name,
+            isPinned = isPinned,
+            onDismiss = { showOptions = false },
+            onTogglePin = { 
+                onTogglePin(source.id)
+                showOptions = false
+            },
+            onHide = {
+                onToggleHide(source.id)
+                showOptions = false
+            }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { navigator.push(CatalogueScreen(source.id, source.name, latest = false)) }
+            .combinedClickable(
+                onClick = { navigator.push(CatalogueScreen(source.id, source.name, latest = false)) },
+                onLongClick = { showOptions = true }
+            )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -638,7 +671,7 @@ fun SourceItem(
         
         // Actions
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val supportsLatest = (source as? eu.kanade.tachiyomi.source.CatalogueSource)?.supportsLatest == true
+            val supportsLatest = (source as? CatalogueSource)?.supportsLatest == true
             if (supportsLatest) {
                 TextButton(
                     onClick = { navigator.push(CatalogueScreen(source.id, source.name, latest = true)) },
@@ -1153,4 +1186,50 @@ fun ExtensionDetailsDialog(
     )
 }
 
-
+@Composable
+fun SourceOptionsDialog(
+    sourceName: String,
+    isPinned: Boolean,
+    onDismiss: () -> Unit,
+    onTogglePin: () -> Unit,
+    onHide: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(sourceName, color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                androidx.compose.material3.TextButton(
+                    onClick = onTogglePin,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (isPinned) Icons.Default.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(if (isPinned) "Bỏ ghim" else "Ghim", color = Color.White, fontSize = 16.sp)
+                    }
+                }
+                androidx.compose.material3.TextButton(
+                    onClick = onHide,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.VisibilityOff, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text("Ẩn nguồn này", color = Color.White, fontSize = 16.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Đóng", color = PrimaryOrange)
+            }
+        },
+        containerColor = BackgroundDark
+    )
+}

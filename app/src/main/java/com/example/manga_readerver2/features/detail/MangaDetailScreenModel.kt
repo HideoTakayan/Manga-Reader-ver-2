@@ -63,6 +63,15 @@ class MangaDetailScreenModel(
     private val _filterMode = MutableStateFlow(ChapterFilter.ALL)
     val filterMode: StateFlow<ChapterFilter> = _filterMode.asStateFlow()
 
+    private val _selectedChapterIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedChapterIds: StateFlow<Set<Long>> = _selectedChapterIds.asStateFlow()
+
+    val isSelectionMode: StateFlow<Boolean> = combine(
+        _selectedChapterIds
+    ) { ids ->
+        ids.first().isNotEmpty()
+    }.stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _source = MutableStateFlow<Source?>(null)
     val source: StateFlow<Source?> = _source.asStateFlow()
 
@@ -369,6 +378,21 @@ class MangaDetailScreenModel(
 
     fun setFilterMode(mode: ChapterFilter) {
         _filterMode.value = mode
+    }
+
+
+    fun toggleSelection(chapterId: Long) {
+        _selectedChapterIds.value = _selectedChapterIds.value.let { current ->
+            if (current.contains(chapterId)) current - chapterId else current + chapterId
+        }
+    }
+
+    fun selectAll() {
+        _selectedChapterIds.value = _allChapters.value.map { it.id }.toSet()
+    }
+
+    fun clearSelection() {
+        _selectedChapterIds.value = emptySet()
     }
 
     val categories = mangaRepository.getCategories()

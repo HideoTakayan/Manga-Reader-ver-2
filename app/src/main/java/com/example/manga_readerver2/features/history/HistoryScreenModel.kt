@@ -4,6 +4,7 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import com.example.manga_readerver2.domain.model.History
 import com.example.manga_readerver2.domain.repository.MangaRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import uy.kohesive.injekt.Injekt
@@ -63,7 +64,7 @@ class HistoryScreenModel : ScreenModel {
         screenModelScope.launch {
             _isLoading.value = true
             repository.getHistory()
-                .catch { 
+                .catch {
                     _isLoading.value = false
                     it.printStackTrace()
                 }
@@ -89,5 +90,31 @@ class HistoryScreenModel : ScreenModel {
             repository.deleteHistoryByMangaId(mangaId)
         }
     }
-}
 
+    fun deleteHistoryByChapterId(chapterId: Long) {
+        screenModelScope.launch {
+            repository.deleteHistoryByChapterId(chapterId)
+        }
+    }
+
+    /** Kiểm tra truyện đã có trong thư viện (favorite = true) chưa */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun isInLibrary(mangaId: Long): Flow<Boolean> {
+        return flow {
+            val manga = repository.getMangaById(mangaId)
+            emit(manga?.favorite == true)
+        }.flatMapLatest {
+            // Lắng nghe thư viện để cập nhật real-time
+            repository.getFavorites().map { favList ->
+                favList.any { it.id == mangaId }
+            }
+        }
+    }
+
+    /** Thêm truyện vào thư viện (đánh dấu favorite) */
+    fun addToLibrary(mangaId: Long) {
+        screenModelScope.launch {
+            repository.updateMangaFavorite(mangaId, true)
+        }
+    }
+}

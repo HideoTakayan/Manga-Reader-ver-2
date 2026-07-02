@@ -239,48 +239,92 @@ class LibraryScreen : Screen {
                         selectedCount = selectedMangaIds.size,
                         onClose = { screenModel.clearSelection() },
                         onSelectAll = { screenModel.selectAll() },
-                        onInvertSelection = { screenModel.invertSelection() },
-                        onUpdate = { screenModel.bulkUpdate() },
-                        onMarkRead = { read -> screenModel.bulkMarkRead(read) },
-                        onChangeCategory = { showCategoryDialog = true },
-                        onUnfollow = { screenModel.bulkUnfollow() }
+                        onInvertSelection = { screenModel.invertSelection() }
                     )
-
-                    if (showCategoryDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showCategoryDialog = false },
-                            title = { Text("Thêm vào danh mục", fontWeight = FontWeight.Bold) },
-                            text = {
-                                LazyColumn {
-                                    items(categories) { category ->
-                                        TextButton(
-                                            onClick = {
-                                                screenModel.bulkChangeCategory(category.id)
-                                                showCategoryDialog = false
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(category.name, color = PrimaryOrange, fontSize = 16.sp)
-                                        }
-                                    }
-                                }
-                            },
-                            confirmButton = {
-                                TextButton(onClick = { showCategoryDialog = false }) {
-                                    Text("Hủy", color = Color.Gray)
-                                }
-                            },
-                            containerColor = Color(0xFF2B2B2B),
-                            titleContentColor = Color.White
-                        )
-                    }
                 }
             }
         ) { paddingValues ->
+            var showCategoryDialog by remember { mutableStateOf(false) }
+            var showDeleteDialog by remember { mutableStateOf(false) }
+
+            if (showCategoryDialog) {
+                AlertDialog(
+                    onDismissRequest = { showCategoryDialog = false },
+                    title = { Text("Thêm vào danh mục", fontWeight = FontWeight.Bold) },
+                    text = {
+                        LazyColumn {
+                            items(categories) { category ->
+                                TextButton(
+                                    onClick = {
+                                        screenModel.bulkChangeCategory(category.id)
+                                        showCategoryDialog = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(category.name, color = PrimaryOrange, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showCategoryDialog = false }) {
+                            Text("Hủy", color = Color.Gray)
+                        }
+                    },
+                    containerColor = Color(0xFF2B2B2B),
+                    titleContentColor = Color.White
+                )
+            }
+
+            if (showDeleteDialog) {
+                var deleteDownloads by remember { mutableStateOf(false) }
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Xóa khỏi thư viện?", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column {
+                            Text("Truyện này sẽ bị xóa khỏi thư viện cá nhân của bạn.", color = Color.White.copy(alpha = 0.8f))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { deleteDownloads = !deleteDownloads }
+                            ) {
+                                Checkbox(
+                                    checked = deleteDownloads,
+                                    onCheckedChange = { deleteDownloads = it },
+                                    colors = CheckboxDefaults.colors(checkedColor = PrimaryOrange)
+                                )
+                                Text("Đồng thời xóa các chương đã tải", color = Color.White)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { 
+                            showDeleteDialog = false
+                            screenModel.bulkUnfollow(deleteDownloads = deleteDownloads)
+                        }) {
+                            Text("Đồng ý", color = PrimaryOrange)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) {
+                            Text("Hủy", color = Color.Gray)
+                        }
+                    },
+                    containerColor = Color(0xFF2B2B2B),
+                    titleContentColor = Color.White
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(
+                        top = paddingValues.calculateTopPadding(),
+                        bottom = if (isSelectionMode) paddingValues.calculateBottomPadding() + 80.dp else paddingValues.calculateBottomPadding()
+                    )
             ) {
                 Column {
                     if (categories.isNotEmpty() && !isSearchActive) {
@@ -346,6 +390,21 @@ class LibraryScreen : Screen {
                 if (showSettingsDialog) {
                     LibrarySettingsDialog(
                         onDismissRequest = { showSettingsDialog = false }
+                    )
+                }
+
+                // Selection Bottom Action Bar
+                AnimatedVisibility(
+                    visible = isSelectionMode,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it }),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    SelectionBottomBar(
+                        onUpdate = { screenModel.bulkUpdate() },
+                        onMarkRead = { read -> screenModel.bulkMarkRead(read) },
+                        onChangeCategory = { showCategoryDialog = true },
+                        onDelete = { showDeleteDialog = true }
                     )
                 }
             }
@@ -613,14 +672,8 @@ fun SelectionTopBar(
     selectedCount: Int,
     onClose: () -> Unit,
     onSelectAll: () -> Unit,
-    onInvertSelection: () -> Unit,
-    onUpdate: () -> Unit,
-    onMarkRead: (Boolean) -> Unit,
-    onChangeCategory: () -> Unit,
-    onUnfollow: () -> Unit
+    onInvertSelection: () -> Unit
 ) {
-    var showMoreMenu by remember { mutableStateOf(false) }
-
     Surface(
         color = BackgroundDark,
         tonalElevation = 4.dp,
@@ -637,54 +690,113 @@ fun SelectionTopBar(
                 IconButton(onClick = onSelectAll) {
                     Icon(Icons.Default.SelectAll, contentDescription = "Chọn tất cả", tint = Color.White)
                 }
-                IconButton(onClick = onUpdate) {
-                    Icon(Icons.Default.Sync, contentDescription = "Cập nhật", tint = Color.White)
-                }
-                IconButton(onClick = onUnfollow) {
-                    Icon(Icons.Default.Delete, contentDescription = "Xóa khỏi thư viện", tint = Color.White)
-                }
-                Box {
-                    IconButton(onClick = { showMoreMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Thêm", tint = Color.White)
-                    }
-                    DropdownMenu(
-                        expanded = showMoreMenu,
-                        onDismissRequest = { showMoreMenu = false },
-                        containerColor = Color(0xFF2B2B2B)
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Đảo ngược lựa chọn", color = Color.White) },
-                            onClick = {
-                                showMoreMenu = false
-                                onInvertSelection()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Đánh dấu đã đọc", color = Color.White) },
-                            onClick = {
-                                showMoreMenu = false
-                                onMarkRead(true)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Đánh dấu chưa đọc", color = Color.White) },
-                            onClick = {
-                                showMoreMenu = false
-                                onMarkRead(false)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Chuyển danh mục", color = Color.White) },
-                            onClick = {
-                                showMoreMenu = false
-                                onChangeCategory()
-                            }
-                        )
-                    }
+                IconButton(onClick = onInvertSelection) {
+                    Icon(Icons.Default.Flip, contentDescription = "Đảo ngược", tint = Color.White)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
         )
+    }
+}
+
+@Composable
+fun SelectionBottomBar(
+    onUpdate: () -> Unit,
+    onMarkRead: (Boolean) -> Unit,
+    onChangeCategory: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showMarkMenu by remember { mutableStateOf(false) }
+
+    BottomAppBar(
+        containerColor = Color(0xFF2B2B2B),
+        contentColor = Color.White,
+        tonalElevation = 8.dp,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onUpdate)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Sync, contentDescription = "Cập nhật")
+                    Text("Cập nhật", fontSize = 10.sp, maxLines = 1)
+                }
+            }
+            
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showMarkMenu = true }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.DoneAll, contentDescription = "Đánh dấu")
+                        Text("Đánh dấu", fontSize = 10.sp, maxLines = 1)
+                    }
+                }
+                DropdownMenu(
+                    expanded = showMarkMenu,
+                    onDismissRequest = { showMarkMenu = false },
+                    containerColor = Color(0xFF2B2B2B)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Đã đọc", color = Color.White) },
+                        onClick = {
+                            showMarkMenu = false
+                            onMarkRead(true)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Chưa đọc", color = Color.White) },
+                        onClick = {
+                            showMarkMenu = false
+                            onMarkRead(false)
+                        }
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onChangeCategory)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Label, contentDescription = "Danh mục")
+                    Text("Danh mục", fontSize = 10.sp, maxLines = 1)
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onDelete)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Delete, contentDescription = "Xóa")
+                    Text("Xóa", fontSize = 10.sp, maxLines = 1)
+                }
+            }
+        }
     }
 }
 

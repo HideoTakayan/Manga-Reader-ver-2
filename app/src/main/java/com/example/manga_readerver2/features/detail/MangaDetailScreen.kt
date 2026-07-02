@@ -70,6 +70,9 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
         val source by screenModel.source.collectAsState()
         val errorMessage by screenModel.errorMessage.collectAsState()
 
+        val selectedChapterIds by screenModel.selectedChapterIds.collectAsState()
+        val isSelectionMode by screenModel.isSelectionMode.collectAsState()
+
         val listState = rememberLazyListState()
         val isScrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 300 } }
         
@@ -105,8 +108,31 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                     onDownloadAction = { screenModel.runDownloadAction(it) }
                 )
             },
+            bottomBar = {
+                if (isSelectionMode) {
+                    MangaDetailBottomActionBar(
+                        selectedCount = selectedChapterIds.size,
+                        onDownload = {
+                            screenModel.downloadChapters(selectedChapterIds.toList())
+                            screenModel.clearSelection()
+                        },
+                        onMarkRead = {
+                            screenModel.markChaptersRead(selectedChapterIds.toList(), true)
+                            screenModel.clearSelection()
+                        },
+                        onMarkUnread = {
+                            screenModel.markChaptersRead(selectedChapterIds.toList(), false)
+                            screenModel.clearSelection()
+                        },
+                        onDelete = {
+                            Toast.makeText(context, "Đã xóa ${selectedChapterIds.size} chương (đang hoàn thiện)", Toast.LENGTH_SHORT).show()
+                            screenModel.clearSelection()
+                        }
+                    )
+                }
+            },
             floatingActionButton = {
-                if (manga != null && chapters.isNotEmpty()) {
+                if (manga != null && chapters.isNotEmpty() && !isSelectionMode) {
                     val nextToRead = chapters.findLast { !it.read } ?: chapters.firstOrNull()
                     if (nextToRead != null) {
                         ExtendedFloatingActionButton(
@@ -205,14 +231,17 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                             Toast.makeText(context, "Chức năng theo dõi sẽ sớm ra mắt!", Toast.LENGTH_SHORT).show()
                         },
                         onTagClick = { tag ->
-                            // TODO: Chuyển đến màn hình tìm kiếm với tag
                             Toast.makeText(context, "Tìm kiếm tag: $tag", Toast.LENGTH_SHORT).show()
+                        },
+                        selectedChapterIds = selectedChapterIds,
+                        isSelectionMode = isSelectionMode,
+                        onToggleSelection = { id ->
+                            screenModel.toggleSelection(id)
                         }
                     )
-                    } // end manga != null
-                } // end when
+                    }
+                }
 
-                // Dialogs
                 if (showChapterDialog) {
                     ChapterSettingsDialog(
                         currentSort = sortMode,
@@ -349,7 +378,7 @@ fun MangaDetailTopBar(
                         )
                         DropdownMenuItem(
                             text = { Text("Chia sẻ", color = Color.White) },
-                            onClick = { showMoreMenu = false; /* TODO: Handle share from TopBar, will add later */ }
+                            onClick = { showMoreMenu = false }
                         )
                     }
                 }
@@ -376,7 +405,10 @@ fun MangaDetailContent(
     onShareClick: () -> Unit,
     onTrackClick: () -> Unit,
     onTagClick: (String) -> Unit,
-    downloadStatus: Map<Long, com.example.manga_readerver2.core.download.Download.State>
+    downloadStatus: Map<Long, com.example.manga_readerver2.core.download.Download.State>,
+    selectedChapterIds: Set<Long>,
+    isSelectionMode: Boolean,
+    onToggleSelection: (Long) -> Unit
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
@@ -515,7 +547,7 @@ fun MangaDetailContent(
                     icon = Icons.Outlined.HourglassEmpty,
                     label = "Cập nhật",
                     color = defaultColor,
-                    onClick = { /* TODO: Edit Fetch Interval */ },
+                    onClick = { },
                     modifier = Modifier.weight(1f)
                 )
                 MangaActionButton(
@@ -618,12 +650,19 @@ fun MangaDetailContent(
 
         items(chapters) { chapter ->
             val state = downloadStatus[chapter.id] ?: com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
+            val isSelected = selectedChapterIds.contains(chapter.id)
             ChapterItem(
                 chapter = chapter,
-                onRead = { onChapterClick(chapter) },
+                onRead = { 
+                    if (isSelectionMode) onToggleSelection(chapter.id) 
+                    else onChapterClick(chapter) 
+                },
                 onDownload = { onDownloadChapter(chapter) },
                 isHttpSource = manga.source != 0L,
-                downloadState = state
+                downloadState = state,
+                isSelected = isSelected,
+                isSelectionMode = isSelectionMode,
+                onLongClick = { onToggleSelection(chapter.id) }
             )
         }
     }
@@ -659,21 +698,33 @@ fun MangaActionButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChapterItem(
     chapter: Chapter,
     onRead: () -> Unit,
     onDownload: () -> Unit,
     isHttpSource: Boolean,
-    downloadState: com.example.manga_readerver2.core.download.Download.State = com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
+    downloadState: com.example.manga_readerver2.core.download.Download.State = com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED,
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onLongClick: () -> Unit = {}
 ) {
+    val backgroundColor by androidx.compose.animation.animateColorAsState(
+        if (isSelected) Color(0xFF1E88E5).copy(alpha = 0.3f) else Color.Transparent
+    )
+    
     Surface(
-        onClick = onRead,
-        color = Color.Transparent,
+        color = backgroundColor,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = onRead,
+                    onLongClick = onLongClick
+                )
+                .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -707,7 +758,7 @@ fun ChapterItem(
                 )
             }
 
-            if (isHttpSource) {
+            if (isHttpSource && !isSelectionMode) {
                 IconButton(
                     onClick = { if (downloadState == com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED) onDownload() },
                     modifier = Modifier.size(32.dp)
@@ -767,7 +818,6 @@ fun MangaCoverDialog(
                 contentScale = ContentScale.Fit
             )
             
-            // Close Button
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).statusBarsPadding()
@@ -778,6 +828,7 @@ fun MangaCoverDialog(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChapterSettingsDialog(
     currentSort: com.example.manga_readerver2.features.detail.ChapterSort,
@@ -805,21 +856,19 @@ fun ChapterSettingsDialog(
                         label = { Text("Cũ nhất") }
                     )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Lọc", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
-                Row {
+                
+                Text("Lọc theo", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(vertical = 8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.ALL,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.ALL) },
                         label = { Text("Tất cả") }
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.UNREAD,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.UNREAD) },
                         label = { Text("Chưa đọc") }
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     FilterChip(
                         selected = currentFilter == com.example.manga_readerver2.features.detail.ChapterFilter.DOWNLOADED,
                         onClick = { onFilterChange(com.example.manga_readerver2.features.detail.ChapterFilter.DOWNLOADED) },
@@ -839,6 +888,70 @@ fun ChapterSettingsDialog(
 }
 
 @Composable
+fun MangaDetailBottomActionBar(
+    selectedCount: Int,
+    onMarkRead: () -> Unit,
+    onMarkUnread: () -> Unit,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFF1E1E1E),
+        tonalElevation = 8.dp,
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .navigationBarsPadding(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onMarkRead)
+                    .padding(8.dp)
+            ) {
+                Icon(Icons.Default.DoneAll, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Text("Đã đọc", color = Color.White, fontSize = 10.sp)
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onMarkUnread)
+                    .padding(8.dp)
+            ) {
+                Icon(Icons.Default.RemoveDone, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Text("Chưa đọc", color = Color.White, fontSize = 10.sp)
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onDownload)
+                    .padding(8.dp)
+            ) {
+                Icon(Icons.Default.DownloadForOffline, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Text("Tải xuống", color = Color.White, fontSize = 10.sp)
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onDelete)
+                    .padding(8.dp)
+            ) {
+                Icon(Icons.Default.DeleteOutline, contentDescription = null, tint = Color(0xFFCF6679), modifier = Modifier.size(22.dp))
+                Text("Xóa tải về", color = Color(0xFFCF6679), fontSize = 10.sp)
+            }
+        }
+    }
+}@Composable
 fun CategorySelectionDialog(
     allCategories: List<Category>,
     selectedIds: List<Long>,

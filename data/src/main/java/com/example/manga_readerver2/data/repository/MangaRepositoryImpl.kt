@@ -187,7 +187,8 @@ class MangaRepositoryImpl(
 
     override suspend fun updateMangaFavorite(id: Long, favorite: Boolean) {
         withContext<Unit>(Dispatchers.IO) {
-            mangaQueries.updateMangaFavorite(favorite, id)
+            val dateAdded = if (favorite) System.currentTimeMillis() else 0L
+            mangaQueries.updateMangaFavorite(favorite, dateAdded, id)
         }
     }
 
@@ -367,6 +368,12 @@ class MangaRepositoryImpl(
     override suspend fun deleteHistoryByMangaId(mangaId: Long) {
         withContext<Unit>(Dispatchers.IO) {
             historyQueries.deleteHistoryByMangaId(mangaId)
+        }
+    }
+
+    override suspend fun deleteHistoryByChapterId(chapterId: Long) {
+        withContext<Unit>(Dispatchers.IO) {
+            historyQueries.deleteHistoryByChapterId(chapterId)
         }
     }
 

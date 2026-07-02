@@ -13,6 +13,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.Injekt
@@ -40,6 +42,9 @@ class GlobalSearchScreenModel(
 
     private val _state = MutableStateFlow(GlobalSearchState())
     val state = _state.asStateFlow()
+
+    val pinnedSources: kotlinx.coroutines.flow.StateFlow<Set<String>> = sourcePreferences.pinnedSources.asFlow()
+        .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), sourcePreferences.pinnedSources.get())
 
     private var searchJob: Job? = null
 

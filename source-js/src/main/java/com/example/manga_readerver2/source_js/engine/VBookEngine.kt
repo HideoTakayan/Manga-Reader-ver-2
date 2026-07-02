@@ -20,28 +20,28 @@ class VBookEngine(
     private val rootDir: File,
 ) : AutoCloseable {
 
-    private val quickJs = QuickJs.create()
     private val jsEnv = JsEnvironment(client)
     private val elementsMap = mutableMapOf<Int, org.jsoup.select.Elements>()
     private var nextId = 0
     private val mutex = Mutex()
 
-    init {
-        setupBindings()
-    }
-
-    private fun setupBindings() {
+    private fun setupBindings(quickJs: QuickJs) {
         quickJs.set("AndroidApp", AndroidAppBridge::class.java, object : AndroidAppBridge {
             override fun fetch(url: String, optionsJson: String): String {
-                val options = parseRequestOptions(optionsJson)
-                val response = jsEnv.fetch(url, options)
-                return buildString {
-                    append("{")
-                    append("\"ok\":${response.ok},")
-                    append("\"status\":${response.status},")
-                    append("\"headers\":${Json.encodeToString(response.headers)},")
-                    append("\"text\":${org.json.JSONObject.quote(response.text())}")
-                    append("}")
+                return try {
+                    val options = parseRequestOptions(optionsJson)
+                    val response = jsEnv.fetch(url, options)
+                    buildString {
+                        append("{")
+                        append("\"ok\":${response.ok},")
+                        append("\"status\":${response.status},")
+                        append("\"headers\":${Json.encodeToString(response.headers)},")
+                        append("\"text\":${org.json.JSONObject.quote(response.text())}")
+                        append("}")
+                    }
+                } catch (e: Exception) {
+                    logcat(LogPriority.ERROR) { "AndroidApp.fetch error: ${e.message}" }
+                    """{"ok":false,"status":500,"headers":{},"text":""}"""
                 }
             }
 
@@ -108,7 +108,7 @@ class VBookEngine(
             }
 
             override fun jsoupRemove(id: Int) {
-                elementsMap[id]?.remove()
+                elementsMap.remove(id)
             }
 
             private fun createEmptyElements(): Int {
@@ -389,16 +389,26 @@ class VBookEngine(
                         })();
                     """.trimIndent()
 
-                    quickJs.evaluate(callScript)?.toString()
+                    var quickJs: QuickJs? = null
+                    try {
+                        quickJs = QuickJs.create()
+                        setupBindings(quickJs)
+                        val res = quickJs.evaluate(callScript)?.toString()
+                        res
+                    } finally {
+                        quickJs?.close()
+                        elementsMap.clear() // Prevent memory leak of JSoup Elements
+                    }
                 } catch (e: Exception) {
                     logcat(LogPriority.ERROR) { "JS Error in $functionName: ${e.message}" }
+                    elementsMap.clear() // Prevent memory leak even on error
                     null
                 }
             }
         }
 
     override fun close() {
-        quickJs.close()
+        // No-op. QuickJs is now managed inside execute()
     }
 
     interface AndroidAppBridge {

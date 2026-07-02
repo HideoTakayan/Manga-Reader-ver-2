@@ -47,3 +47,6 @@ deleteHistoryByMangaId:
 DELETE FROM history WHERE chapter_id IN (
     SELECT _id FROM chapters WHERE manga_id = ?
 );
+
+deleteHistoryByChapterId:
+DELETE FROM history WHERE chapter_id = ?;

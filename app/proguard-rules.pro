@@ -27,7 +27,7 @@
 # ================================
 # Kotlin Serialization
 # ================================
--keepattributes *Annotation*, InnerClasses
+-keepattributes *Annotation*, InnerClasses, Signature, EnclosingMethod, Exceptions
 -keepclassmembers class * {
     @kotlinx.serialization.Serializable <fields>;
 }

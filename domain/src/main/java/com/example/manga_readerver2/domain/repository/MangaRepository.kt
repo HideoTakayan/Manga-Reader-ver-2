@@ -47,6 +47,7 @@ interface MangaRepository {
     suspend fun upsertHistory(chapterId: Long, lastRead: Long, timeRead: Long)
     suspend fun deleteAllHistory()
     suspend fun deleteHistoryByMangaId(mangaId: Long)
+    suspend fun deleteHistoryByChapterId(chapterId: Long)
 
     // Statistics
     fun getStats(): Flow<StatisticsData>

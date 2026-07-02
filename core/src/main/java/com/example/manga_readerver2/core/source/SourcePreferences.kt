@@ -12,4 +12,5 @@ class SourcePreferences(
     val extensionInstaller = preferenceStore.getInt("extension_installer", 0) // 0: Legacy, 1: Private
     val allowUntrustedExtensions = preferenceStore.getBoolean("allow_untrusted_extensions", false)
     val localSourceUri = preferenceStore.getString("local_source_uri", "")
+    val hiddenSources = preferenceStore.getStringSet("hidden_sources", emptySet<String>())
 }
