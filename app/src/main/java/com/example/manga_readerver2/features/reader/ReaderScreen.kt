@@ -511,15 +511,48 @@ fun ReaderMainContent(
                     title = { Text("Tùy chọn trang", color = Color.White) },
                     containerColor = CardBackground,
                     text = {
+                        val context = androidx.compose.ui.platform.LocalContext.current
                         Column {
-                            androidx.compose.material3.TextButton(onClick = { /* TODO: Tải ảnh */ longPressedPage = null }) {
+                            androidx.compose.material3.TextButton(onClick = {
+                                val url = when (val p = longPressedPage) {
+                                    is com.example.manga_readerver2.features.reader.ReaderPage.Online -> p.url
+                                    is com.example.manga_readerver2.features.reader.ReaderPage.Local -> p.file.absolutePath
+                                    else -> ""
+                                }
+                                if (url.startsWith("http")) {
+                                    try {
+                                        val request = android.app.DownloadManager.Request(android.net.Uri.parse(url))
+                                            .setTitle("Đang tải ảnh...")
+                                            .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                            .setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "manga_image_${System.currentTimeMillis()}.jpg")
+                                        val manager = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                        manager.enqueue(request)
+                                        android.widget.Toast.makeText(context, "Đã bắt đầu tải ảnh", android.widget.Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(context, "Không thể tải ảnh", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    android.widget.Toast.makeText(context, "Ảnh cục bộ, không hỗ trợ tải lại", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                longPressedPage = null
+                            }) {
                                 Text("Tải trang này", color = PrimaryOrange)
                             }
-                            androidx.compose.material3.TextButton(onClick = { /* TODO: Chia sẻ */ longPressedPage = null }) {
-                                Text("Chia sẻ", color = PrimaryOrange)
-                            }
-                            androidx.compose.material3.TextButton(onClick = { /* TODO: Đặt ảnh bìa */ longPressedPage = null }) {
-                                Text("Đặt làm ảnh bìa", color = PrimaryOrange)
+                            androidx.compose.material3.TextButton(onClick = {
+                                val url = when (val p = longPressedPage) {
+                                    is com.example.manga_readerver2.features.reader.ReaderPage.Online -> p.url
+                                    is com.example.manga_readerver2.features.reader.ReaderPage.Local -> p.file.absolutePath
+                                    else -> ""
+                                }
+                                val shareIntent = android.content.Intent().apply {
+                                    action = android.content.Intent.ACTION_SEND
+                                    putExtra(android.content.Intent.EXTRA_TEXT, url)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Chia sẻ ảnh"))
+                                longPressedPage = null
+                            }) {
+                                Text("Chia sẻ URL ảnh", color = PrimaryOrange)
                             }
                         }
                     },

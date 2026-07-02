@@ -9,5 +9,7 @@ data class LibraryItem(
     val manga: Manga,
     val unreadCount: Int = 0,
     val isDownloaded: Boolean = false,
-    val categoryId: Long = 0
+    val categoryId: Long = 0,
+    val hasStarted: Boolean = false,
+    val hasBookmark: Boolean = false
 )

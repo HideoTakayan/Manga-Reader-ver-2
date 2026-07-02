@@ -146,15 +146,23 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                 }
 
                 // Grid Manga Paging
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (pagingData.loadState.refresh is LoadState.Loading) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = Color.White)
+                @OptIn(ExperimentalMaterial3Api::class)
+                androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                    isRefreshing = pagingData.loadState.refresh is LoadState.Loading,
+                    onRefresh = { pagingData.refresh() },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (pagingData.loadState.refresh is LoadState.Loading && pagingData.itemCount == 0) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = Color.White)
+                        }
                     } else {
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(100.dp),
                             contentPadding = PaddingValues(16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxSize()
                         ) {
                             items(pagingData.itemCount) { index ->
                                 val manga = pagingData[index]

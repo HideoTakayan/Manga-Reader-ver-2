@@ -91,10 +91,16 @@ class LibraryScreenModel(
                 val mangaDir = fileManager.getMangaPath(sourceName, manga.title, manga.id.toString())
                 val hasDownloads = mangaDir.exists() && mangaDir.listFiles()?.any { it.extension == "cbz" || it.extension == "epub" } == true
 
+                val chapters = mangaRepository.getChaptersByMangaId(manga.id)
+                val hasStarted = chapters.any { it.read || it.lastPageRead > 0 }
+                val hasBookmark = chapters.any { it.bookmark }
+
                 LibraryItem(
                     manga = manga,
                     unreadCount = item.unreadCount,
-                    isDownloaded = hasDownloads
+                    isDownloaded = hasDownloads,
+                    hasStarted = hasStarted,
+                    hasBookmark = hasBookmark
                 )
             }.filter { item ->
                 // Apply Tri-state Filters
@@ -110,7 +116,19 @@ class LibraryScreenModel(
                     com.example.manga_readerver2.core.preference.TriState.ENABLED_NOT -> item.unreadCount == 0
                 }
 
-                matchDownloaded && matchUnread
+                val matchStarted = when (com.example.manga_readerver2.core.preference.TriState.entries[fStarted]) {
+                    com.example.manga_readerver2.core.preference.TriState.DISABLED -> true
+                    com.example.manga_readerver2.core.preference.TriState.ENABLED_IS -> item.hasStarted
+                    com.example.manga_readerver2.core.preference.TriState.ENABLED_NOT -> !item.hasStarted
+                }
+
+                val matchBookmarked = when (com.example.manga_readerver2.core.preference.TriState.entries[fBookmarked]) {
+                    com.example.manga_readerver2.core.preference.TriState.DISABLED -> true
+                    com.example.manga_readerver2.core.preference.TriState.ENABLED_IS -> item.hasBookmark
+                    com.example.manga_readerver2.core.preference.TriState.ENABLED_NOT -> !item.hasBookmark
+                }
+
+                matchDownloaded && matchUnread && matchStarted && matchBookmarked
             }.let { filteredList ->
                 if (query.isEmpty()) filteredList else filteredList.filter { it.manga.title.contains(query, ignoreCase = true) }
             }

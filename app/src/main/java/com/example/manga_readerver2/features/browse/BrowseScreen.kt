@@ -10,8 +10,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -147,25 +148,52 @@ class BrowseScreen : Screen {
             containerColor = BackgroundDark,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                if (isSearching && selectedTab == 1) {
-                    SearchAppBar(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        onCloseSearch = {
-                            isSearching = false
-                            searchQuery = ""
+                TopAppBar(
+                    title = {
+                        if (isSearching && selectedTab == 1) {
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("Tìm phần mở rộng...", color = Color.White.copy(alpha = 0.5f), fontSize = 16.sp) },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    cursorColor = PrimaryOrange,
+                                    focusedTextColor = Color.White
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Text("Duyệt", color = Color.White, fontWeight = FontWeight.Bold)
                         }
-                    )
-                } else {
-                    TopAppBar(
-                        title = { Text("Duyệt", color = Color.White, fontWeight = FontWeight.Bold) },
-                        actions = {
+                    },
+                    navigationIcon = {
+                        if (isSearching && selectedTab == 1) {
+                            IconButton(onClick = {
+                                isSearching = false
+                                searchQuery = ""
+                            }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Đóng", tint = Color.White)
+                            }
+                        }
+                    },
+                    actions = {
+                        if (isSearching && selectedTab == 1) {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Xóa", tint = Color.White)
+                                }
+                            }
+                        } else {
                             if (selectedTab == 0) { // Nguồn
                                 IconButton(onClick = { rootNavigator.push(GlobalSearchScreen()) }) {
                                     Icon(Icons.Default.Search, contentDescription = "Tìm kiếm", tint = Color.White)
                                 }
                                 IconButton(onClick = { folderPickerLauncher.launch(null) }) {
-                                    Icon(Icons.Default.FolderOpen, contentDescription = "Local Source", tint = Color.White)
+                                    Icon(Icons.Default.FolderOpen, contentDescription = "Nguồn cục bộ", tint = Color.White)
                                 }
                                 IconButton(onClick = { showLangDialog = true }) {
                                     Icon(Icons.Default.FilterList, contentDescription = "Bộ lọc", tint = Color.White)
@@ -184,10 +212,10 @@ class BrowseScreen : Screen {
                                     Icon(Icons.Default.Refresh, contentDescription = "Làm mới", tint = Color.White)
                                 }
                             }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-                    )
-                }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                )
             }
         ) { paddingValues ->
             Column(modifier = Modifier.padding(paddingValues)) {
@@ -217,7 +245,7 @@ class BrowseScreen : Screen {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
@@ -226,8 +254,12 @@ class BrowseScreen : Screen {
                         label = { Text("Tất cả") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = PrimaryOrange.copy(alpha = 0.2f),
-                            selectedLabelColor = PrimaryOrange
-                        )
+                            selectedLabelColor = PrimaryOrange,
+                            containerColor = Color.White.copy(alpha = 0.05f),
+                            labelColor = Color.LightGray
+                        ),
+                        border = null,
+                        shape = CircleShape
                     )
                     FilterChip(
                         selected = contentTypeFilter == 1,
@@ -235,27 +267,35 @@ class BrowseScreen : Screen {
                         label = { Text("Manga (APK)") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = PrimaryOrange.copy(alpha = 0.2f),
-                            selectedLabelColor = PrimaryOrange
-                        )
+                            selectedLabelColor = PrimaryOrange,
+                            containerColor = Color.White.copy(alpha = 0.05f),
+                            labelColor = Color.LightGray
+                        ),
+                        border = null,
+                        shape = CircleShape
                     )
                     FilterChip(
                         selected = contentTypeFilter == 2,
                         onClick = { contentTypeFilter = 2 },
                         label = { Text("Truyện chữ (JS)") },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF1565C0).copy(alpha = 0.3f),
-                            selectedLabelColor = Color(0xFF64B5F6)
-                        )
+                            selectedContainerColor = PrimaryOrange.copy(alpha = 0.2f),
+                            selectedLabelColor = PrimaryOrange,
+                            containerColor = Color.White.copy(alpha = 0.05f),
+                            labelColor = Color.LightGray
+                        ),
+                        border = null,
+                        shape = CircleShape
                     )
                 }
-                Box(modifier = Modifier.weight(1f)) {
-                    if (isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center),
-                            color = PrimaryOrange
-                        )
-                    }
-
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { 
+                        if (selectedTab == 1) screenModel.refreshExtensions() 
+                        else screenModel.refreshInstalledExtensions() 
+                    },
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                ) {
                     when (selectedTab) {
                         0 -> SourcesTab(
                             rootNavigator, 
@@ -520,9 +560,9 @@ fun SourcesTab(
                 item(key = "header_pinned") {
                     Text(
                         "Đã ghim", 
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                        style = MaterialTheme.typography.labelLarge,
+                        color = PrimaryOrange,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
                 items(pinnedList, key = { "pinned_${it.first.id}_${it.second.pkgName}_${it.first.name}" }) { (source, ext) ->
@@ -541,9 +581,9 @@ fun SourcesTab(
                 item(key = "header_$lang") {
                     Text(
                         text = langName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                        style = MaterialTheme.typography.labelLarge,
+                        color = PrimaryOrange,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
 
@@ -760,12 +800,11 @@ fun ExtensionsTab(
     ) {
         if (filteredUntrusted.isNotEmpty()) {
             item(key = "header_untrusted") {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text(
-                        "CHƯA TIN CẬY (${filteredUntrusted.size})",
+                        "Chưa tin cậy (${filteredUntrusted.size})",
                         color = Color.Red,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        style = MaterialTheme.typography.labelLarge
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -790,7 +829,8 @@ fun ExtensionsTab(
                     extension = ext,
                     installStep = InstallStep.Pending,
                     isUpdate = false,
-                    onClick = { onTrust(ext) },
+                    onClick = { onDetail(ext) },
+                    onActionClick = { onTrust(ext) },
                     onOpenDetails = { onDetail(ext) },
                     trustLabel = "TIN CẬY"
                 )
@@ -802,9 +842,8 @@ fun ExtensionsTab(
                 Text(
                     "Đã cài đặt (${filteredInstalled.size})", 
                     color = PrimaryOrange, 
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
             items(filteredInstalled, key = { "installed_${it.pkgName}" }) { ext ->
@@ -815,8 +854,8 @@ fun ExtensionsTab(
                     extension = ext,
                     installStep = if (hasUpdate) installSteps[ext.pkgName] ?: InstallStep.Pending else null,
                     isUpdate = hasUpdate,
-                    onClick = if (hasUpdate) { { onInstall(availableVersion!!) } } else { { onDetail(ext) } },
-                    onUninstall = { onUninstall(ext.pkgName) },
+                    onClick = { onDetail(ext) },
+                    onActionClick = if (hasUpdate) { { onInstall(availableVersion!!) } } else null,
                     onOpenDetails = { onDetail(ext) }
                 )
             }
@@ -863,9 +902,8 @@ fun ExtensionItem(
     installStep: InstallStep?,
     isUpdate: Boolean = false,
     trustLabel: String? = null,
-    onClick: (() -> Unit)?,
+    onClick: (() -> Unit)? = null,
     onActionClick: (() -> Unit)? = null,
-    onUninstall: (() -> Unit)? = null,
     onOpenDetails: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
@@ -890,18 +928,29 @@ fun ExtensionItem(
             modifier = Modifier.size(40.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (icon != null) {
-                AsyncImage(
-                    model = icon,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+            val isIdle = installStep == null || installStep == InstallStep.Pending || installStep == InstallStep.SystemInstallStarted || installStep == InstallStep.Error
+            if (!isIdle) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(40.dp),
+                    strokeWidth = 2.dp,
+                    color = PrimaryOrange
                 )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize().background(Color.DarkGray, RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Extension, tint = Color.LightGray, contentDescription = null)
+            }
+            val padding = if (isIdle) 0.dp else 8.dp
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                if (icon != null) {
+                    AsyncImage(
+                        model = icon,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(Color.DarkGray, RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Extension, tint = Color.LightGray, contentDescription = null)
+                    }
                 }
             }
         }
@@ -939,12 +988,12 @@ fun ExtensionItem(
                     Text(
                         text = lang.uppercase(),
                         color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodySmall
                     )
-                    Text(" • ", color = Color.Gray)
+                    Text(" • ", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                 }
-                Text(text = version, color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
-                Text(" • ", color = Color.Gray)
+                Text(text = version, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text(" • ", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                 val isJsExt = isJsExtension(extension)
                 val typeLabel = if (isJsExt) "JS" else "APK"
                 val typeColor = if (isJsExt) Color(0xFF64B5F6) else Color(0xFF2196F3)
@@ -962,112 +1011,44 @@ fun ExtensionItem(
         }
         
         // Actions
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (trustLabel != null && onClick != null) {
-                TextButton(
-                    onClick = onClick,
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
-                ) {
-                    Text(trustLabel, fontWeight = FontWeight.ExtraBold)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val isIdle = installStep == null || installStep == InstallStep.Pending || installStep == InstallStep.SystemInstallStarted || installStep == InstallStep.Error
+            
+            if (trustLabel != null && onActionClick != null) {
+                IconButton(onClick = onActionClick) {
+                    Icon(Icons.Outlined.VerifiedUser, contentDescription = trustLabel, tint = PrimaryOrange)
                 }
-            } else if ((!isInstalled || isUpdate) && (onClick != null || onActionClick != null)) {
-                val action = onActionClick ?: onClick
-                when (installStep) {
-                    InstallStep.Pending -> TextButton(
-                        onClick = { action?.invoke() },
-                        colors = ButtonDefaults.textButtonColors(contentColor = PrimaryOrange)
-                    ) {
-                        Text(if (isUpdate) "CẬP NHẬT" else "CÀI ĐẶT", fontWeight = FontWeight.ExtraBold)
+            } else if (isIdle) {
+                if (isInstalled) {
+                    IconButton(onClick = { onOpenDetails?.invoke() }) {
+                        Icon(Icons.Outlined.Settings, tint = Color.Gray, contentDescription = "Cài đặt")
                     }
-                    InstallStep.Downloading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), color = PrimaryOrange, strokeWidth = 2.dp)
-                    InstallStep.Installing -> Text("ĐANG CÀI...", color = PrimaryOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    InstallStep.SystemInstallStarted -> Text("XONG Ở HỆ THỐNG", color = PrimaryOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    else -> Icon(Icons.Default.Check, tint = Color.Green, contentDescription = null)
-                }
-            } else if (isInstalled) {
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.Settings, tint = Color.Gray, contentDescription = null)
+                    
+                    if (isUpdate && (onClick != null || onActionClick != null)) {
+                        val action = onActionClick ?: onClick
+                        IconButton(onClick = { action?.invoke() }) {
+                            Icon(Icons.Outlined.GetApp, tint = PrimaryOrange, contentDescription = "Cập nhật")
+                        }
                     }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        containerColor = BackgroundDark
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Chi tiết", color = Color.White) },
-                            onClick = {
-                                showMenu = false
-                                onOpenDetails?.invoke()
-                            },
-                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color.White) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Thông tin ứng dụng", color = Color.White) },
-                            onClick = {
-                                showMenu = false
-                                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = android.net.Uri.fromParts("package", extension.pkgName, null)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-                            },
-                            leadingIcon = { Icon(Icons.Default.Launch, contentDescription = null, tint = Color.White) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Gỡ cài đặt", color = Color.Red) },
-                            onClick = {
-                                showMenu = false
-                                onUninstall?.invoke()
-                            },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
-                        )
+                } else if (!isInstalled && (onClick != null || onActionClick != null)) {
+                    val action = onActionClick ?: onClick
+                    val extAvail = extension as? Extension.Available
+                    if (extAvail != null && extAvail.sources.isNotEmpty()) {
+                        IconButton(onClick = { onOpenDetails?.invoke() }) {
+                            Icon(Icons.Outlined.Public, tint = Color.Gray, contentDescription = "Mở web")
+                        }
+                    }
+                    
+                    IconButton(onClick = { action?.invoke() }) {
+                        Icon(Icons.Outlined.GetApp, tint = PrimaryOrange, contentDescription = "Cài đặt")
                     }
                 }
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SearchAppBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onCloseSearch: () -> Unit
-) {
-    TopAppBar(
-        title = {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text("Tìm phần mở rộng...", color = Color.Gray) },
-                singleLine = true,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    cursorColor = PrimaryOrange,
-                    focusedTextColor = Color.White
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onCloseSearch) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
-            }
-        },
-        actions = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
-                }
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-    )
 }
 
 @Composable

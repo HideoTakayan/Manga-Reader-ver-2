@@ -105,7 +105,21 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                     onRefresh = { screenModel.refreshManual() },
                     isHttpSource = source is eu.kanade.tachiyomi.source.online.HttpSource,
                     isScrolled = isScrolled,
-                    onDownloadAction = { screenModel.runDownloadAction(it) }
+                    onDownloadAction = { screenModel.runDownloadAction(it) },
+                    onShare = {
+                        if (manga != null) {
+                            val mangaUrl = manga.url
+                            if (mangaUrl.startsWith("local/")) {
+                                Toast.makeText(context, "Truyện cục bộ không thể chia sẻ", Toast.LENGTH_SHORT).show()
+                            } else {
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, "${manga.title}\n$mangaUrl")
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Chia sẻ truyện"))
+                            }
+                        }
+                    }
                 )
             },
             bottomBar = {
@@ -125,7 +139,8 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                             screenModel.clearSelection()
                         },
                         onDelete = {
-                            Toast.makeText(context, "Đã xóa ${selectedChapterIds.size} chương (đang hoàn thiện)", Toast.LENGTH_SHORT).show()
+                            screenModel.deleteChapters(selectedChapterIds.toList())
+                            Toast.makeText(context, "Đã xóa ${selectedChapterIds.size} chương", Toast.LENGTH_SHORT).show()
                             screenModel.clearSelection()
                         }
                     )
@@ -182,63 +197,87 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                         }
                     }
                     manga != null -> {
-                    MangaDetailContent(
-                        paddingValues = paddingValues,
-                        listState = listState,
-                        manga = manga,
-                        sourceName = source?.name ?: "Unknown",
-                        chapters = chapters,
-                        downloadStatus = screenModel.downloadStatus.collectAsState().value,
-                        isLiked = isLiked,
-                        onFavoriteClick = {
-                            if (isLiked) {
-                                // Đang liked → mở dialog để đổi category hoặc unfavorite
-                                showCategoryDialog = true
-                            } else {
-                                // Chưa liked → toggle favorite rồi mở dialog chọn category (chuẩn Mihon)
-                                screenModel.toggleLike()
-                                showCategoryDialog = true
+                        val ptrState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+                        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                            isRefreshing = isLoading,
+                            onRefresh = { screenModel.refreshManual() },
+                            modifier = Modifier.fillMaxSize(),
+                            state = ptrState,
+                            indicator = {
+                                androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = paddingValues.calculateTopPadding()),
+                                    isRefreshing = isLoading,
+                                    state = ptrState,
+                                    color = PrimaryOrange
+                                )
                             }
-                        },
-                        onChapterClick = { chapter ->
-                            navigator.push(ReaderScreen(manga.id, chapter.id))
-                        },
-                        onDownloadChapter = { screenModel.downloadChapter(it) },
-                        onFilterClick = { showChapterDialog = true },
-                        onCoverClick = { showCoverDialog = true },
-                        onWebViewClick = {
-                            val httpSource = source as? HttpSource
-                            val mangaUrl = if (httpSource != null) "${httpSource.baseUrl}${manga.url}" else null
-                            if (mangaUrl != null) {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mangaUrl))
-                                context.startActivity(intent)
-                            } else {
-                                Toast.makeText(context, "Nguồn không hỗ trợ xem trên trình duyệt", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        onShareClick = {
-                            val httpSource = source as? HttpSource
-                            val mangaUrl = if (httpSource != null) "${httpSource.baseUrl}${manga.url}" else null
-                            if (mangaUrl != null) {
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, "${manga.title}\n$mangaUrl")
+                        ) {
+                            MangaDetailContent(
+                                paddingValues = paddingValues,
+                                listState = listState,
+                                manga = manga,
+                                sourceName = source?.name ?: "Unknown",
+                                chapters = chapters,
+                                downloadStatus = screenModel.downloadStatus.collectAsState().value,
+                                isLiked = isLiked,
+                                onFavoriteClick = {
+                                    if (isLiked) {
+                                        // Đang liked → mở dialog để đổi category hoặc unfavorite
+                                        showCategoryDialog = true
+                                    } else {
+                                        // Chưa liked → toggle favorite rồi mở dialog chọn category (chuẩn Mihon)
+                                        screenModel.toggleLike()
+                                        showCategoryDialog = true
+                                    }
+                                },
+                                onChapterClick = { chapter ->
+                                    navigator.push(ReaderScreen(manga.id, chapter.id))
+                                },
+                                onDownloadChapter = { screenModel.downloadChapter(it) },
+                                onFilterClick = { showChapterDialog = true },
+                                onCoverClick = { showCoverDialog = true },
+                                onWebViewClick = {
+                                    val httpSource = source as? HttpSource
+                                    val mangaUrl = if (httpSource != null) "${httpSource.baseUrl}${manga.url}" else null
+                                    if (mangaUrl != null) {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mangaUrl))
+                                        context.startActivity(intent)
+                                    } else {
+                                        Toast.makeText(context, "Nguồn không hỗ trợ xem trên trình duyệt", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                onShareClick = {
+                                    val httpSource = source as? HttpSource
+                                    val mangaUrl = if (httpSource != null) "${httpSource.baseUrl}${manga.url}" else null
+                                    if (mangaUrl != null) {
+                                        val intent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, "${manga.title}\n$mangaUrl")
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, "Chia sẻ truyện"))
+                                    }
+                                },
+                                onTrackClick = {
+                                    val trackPrefs = Injekt.get<com.example.manga_readerver2.core.track.TrackPreferences>()
+                                    if (trackPrefs.anilistToken.get().isEmpty()) {
+                                        Toast.makeText(context, "Vui lòng đăng nhập AniList để theo dõi", Toast.LENGTH_SHORT).show()
+                                        navigator.push(com.example.manga_readerver2.features.settings.TrackSettingsScreen())
+                                    } else {
+                                        Toast.makeText(context, "Tiến độ được tự động đồng bộ lên AniList khi bạn đọc hết 1 chương.", Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                onTagClick = { tag ->
+                                    navigator.push(com.example.manga_readerver2.features.browse.GlobalSearchScreen(tag))
+                                },
+                                selectedChapterIds = selectedChapterIds,
+                                isSelectionMode = isSelectionMode,
+                                onToggleSelection = { id ->
+                                    screenModel.toggleSelection(id)
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Chia sẻ truyện"))
-                            }
-                        },
-                        onTrackClick = {
-                            Toast.makeText(context, "Chức năng theo dõi sẽ sớm ra mắt!", Toast.LENGTH_SHORT).show()
-                        },
-                        onTagClick = { tag ->
-                            Toast.makeText(context, "Tìm kiếm tag: $tag", Toast.LENGTH_SHORT).show()
-                        },
-                        selectedChapterIds = selectedChapterIds,
-                        isSelectionMode = isSelectionMode,
-                        onToggleSelection = { id ->
-                            screenModel.toggleSelection(id)
+                            )
                         }
-                    )
                     }
                 }
 
@@ -299,7 +338,8 @@ fun MangaDetailTopBar(
     onRefresh: () -> Unit,
     isHttpSource: Boolean,
     isScrolled: Boolean,
-    onDownloadAction: (DownloadAction) -> Unit
+    onDownloadAction: (DownloadAction) -> Unit,
+    onShare: () -> Unit
 ) {
     val backgroundColor by androidx.compose.animation.animateColorAsState(if (isScrolled) Color(0xFF1E1E1E) else Color.Transparent, label = "bg")
     var showDownloadMenu by remember { mutableStateOf(false) }
@@ -378,7 +418,7 @@ fun MangaDetailTopBar(
                         )
                         DropdownMenuItem(
                             text = { Text("Chia sẻ", color = Color.White) },
-                            onClick = { showMoreMenu = false }
+                            onClick = { showMoreMenu = false; onShare() }
                         )
                     }
                 }
@@ -639,7 +679,7 @@ fun MangaDetailContent(
                     fontSize = 17.sp
                 )
                 IconButton(onClick = onFilterClick) {
-                    Icon(Icons.Default.Sort, null, tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White)
                 }
             }
             HorizontalDivider(
@@ -963,11 +1003,11 @@ fun CategorySelectionDialog(
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Categories") },
+        title = { Text("Chỉnh sửa danh mục", color = Color.White) },
         text = {
             Column(modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
                 if (allCategories.isEmpty()) {
-                    Text("No categories created yet.", color = Color.Gray)
+                    Text("Chưa có danh mục nào.", color = Color.Gray)
                 } else {
                     allCategories.forEach { category ->
                         val isChecked = currentSelected.contains(category.id)
@@ -1001,13 +1041,14 @@ fun CategorySelectionDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(currentSelected) }) {
-                Text("Confirm", color = PrimaryOrange)
+                Text("Xác nhận", color = PrimaryOrange)
             }
         },
         dismissButton = {
             TextButton(onClick = onUnfavorite) {
-                Text("Unfavorite", color = Color.Red)
+                Text("Xoá khỏi thư viện", color = Color.Red)
             }
-        }
+        },
+        containerColor = Color(0xFF2B2B2B)
     )
 }

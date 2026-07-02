@@ -64,6 +64,8 @@ class LibraryScreen : Screen {
 
         var isSearchActive by remember { mutableStateOf(false) }
         var showSettingsDialog by remember { mutableStateOf(false) }
+        var showCategoryDialog by remember { mutableStateOf(false) }
+        var showDeleteDialog by remember { mutableStateOf(false) }
         
         val categories by screenModel.categories.collectAsState()
         val selectedCategoryIndex by screenModel.selectedCategoryIndex.collectAsState()
@@ -98,8 +100,9 @@ class LibraryScreen : Screen {
             snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
             containerColor = BackgroundDark,
             topBar = {
-                TopAppBar(
-                    title = {
+                Box {
+                    TopAppBar(
+                        title = {
                         AnimatedContent(
                             targetState = isSearchActive,
                             transitionSpec = {
@@ -233,8 +236,6 @@ class LibraryScreen : Screen {
                     enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
                     exit = fadeOut() + slideOutVertically(targetOffsetY = { -it })
                 ) {
-                    var showCategoryDialog by remember { mutableStateOf(false) }
-
                     SelectionTopBar(
                         selectedCount = selectedMangaIds.size,
                         onClose = { screenModel.clearSelection() },
@@ -242,11 +243,23 @@ class LibraryScreen : Screen {
                         onInvertSelection = { screenModel.invertSelection() }
                     )
                 }
+                } // End of topBar Box
+            },
+            bottomBar = {
+                AnimatedVisibility(
+                    visible = isSelectionMode,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it })
+                ) {
+                    SelectionBottomBar(
+                        onUpdate = { screenModel.bulkUpdate() },
+                        onMarkRead = { read -> screenModel.bulkMarkRead(read) },
+                        onChangeCategory = { showCategoryDialog = true },
+                        onDelete = { showDeleteDialog = true }
+                    )
+                }
             }
         ) { paddingValues ->
-            var showCategoryDialog by remember { mutableStateOf(false) }
-            var showDeleteDialog by remember { mutableStateOf(false) }
-
             if (showCategoryDialog) {
                 AlertDialog(
                     onDismissRequest = { showCategoryDialog = false },
@@ -323,7 +336,7 @@ class LibraryScreen : Screen {
                     .fillMaxSize()
                     .padding(
                         top = paddingValues.calculateTopPadding(),
-                        bottom = if (isSelectionMode) paddingValues.calculateBottomPadding() + 80.dp else paddingValues.calculateBottomPadding()
+                        bottom = paddingValues.calculateBottomPadding()
                     )
             ) {
                 Column {
@@ -390,21 +403,6 @@ class LibraryScreen : Screen {
                 if (showSettingsDialog) {
                     LibrarySettingsDialog(
                         onDismissRequest = { showSettingsDialog = false }
-                    )
-                }
-
-                // Selection Bottom Action Bar
-                AnimatedVisibility(
-                    visible = isSelectionMode,
-                    enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it }),
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                ) {
-                    SelectionBottomBar(
-                        onUpdate = { screenModel.bulkUpdate() },
-                        onMarkRead = { read -> screenModel.bulkMarkRead(read) },
-                        onChangeCategory = { showCategoryDialog = true },
-                        onDelete = { showDeleteDialog = true }
                     )
                 }
             }

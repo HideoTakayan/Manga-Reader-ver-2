@@ -12,12 +12,11 @@ class FileManager(private val context: Context) {
     }
 
     /**
-     * Thư mục gốc: /sdcard/MangaReader/
-     * Giống với cách Mihon lưu tại /sdcard/Mihon/
-     * Yêu cầu MANAGE_EXTERNAL_STORAGE trên Android 11+.
+     * Thư mục gốc: /sdcard/Android/data/com.example.manga_readerver2/files/MangaReader/
+     * Được lưu trong không gian của app nên sẽ TỰ ĐỘNG BỊ XÓA khi gỡ cài đặt app.
      */
     fun getRootPath(): File {
-        val storageDir = Environment.getExternalStorageDirectory()
+        val storageDir = context.getExternalFilesDir(null) ?: context.filesDir
         val dir = File(storageDir, ROOT_FOLDER_NAME)
         if (!dir.exists()) dir.mkdirs()
         return dir

@@ -319,6 +319,19 @@ class MangaDetailScreenModel(
         }
     }
 
+    fun deleteChapters(chapterIds: List<Long>) {
+        screenModelScope.launch(Dispatchers.IO) {
+            val m = _manga.value ?: return@launch
+            val source = sourceManager.get(m.source) ?: return@launch
+            
+            chapterIds.forEach { id ->
+                val chapter = _allChapters.value.find { it.id == id } ?: return@forEach
+                fileManager.deleteChapter(source.name, m.title, m.id.toString(), chapter.name)
+                downloadCache.removeChapter(m.id, chapter.name)
+            }
+        }
+    }
+
     fun runDownloadAction(action: DownloadAction) {
         val m = _manga.value ?: return
         val source = sourceManager.get(m.source) ?: return
