@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.onStart
 
 /**
- * Một hệ thống Preference tối giản nhưng mạnh mẽ chuẩn Mihon.
+ * Một hệ thống Preference tối giản nhưng mạnh mẽ tiêu chuẩn.
  * Hỗ trợ Flow để cập nhật UI ngay lập tức khi cài đặt thay đổi.
  */
 class PreferenceStore(context: Context) {

@@ -1,4 +1,4 @@
-﻿package com.example.manga_readerver2.features.settings
+package com.example.manga_readerver2.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -36,7 +36,7 @@ class LibrarySettingsScreen : Screen {
         var updateInterval by remember { mutableStateOf(libraryPreferences.updateInterval.get()) }
         var wifiOnly by remember { mutableStateOf(libraryPreferences.updateWifiOnly.get()) }
 
-        // Mở Dialog chọn Tần suất
+        // Kích hoạt hộp thoại tần suất (Frequency Dialog)
         var showIntervalDialog by remember { mutableStateOf(false) }
 
         val intervalOptions = listOf(
@@ -68,7 +68,7 @@ class LibrarySettingsScreen : Screen {
             ) {
                 SettingsSectionHeader(title = "Cập nhật ngầm")
 
-                // Chọn Tần suất
+                // Tùy chỉnh chu kỳ đồng bộ
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable { showIntervalDialog = true },
                     color = Color.Transparent
@@ -80,7 +80,7 @@ class LibrarySettingsScreen : Screen {
                     }
                 }
 
-                // Switch WiFi Only
+                // Tùy chỉnh điều kiện đồng bộ qua mạng WiFi
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable {
                         if (updateInterval != 0) {

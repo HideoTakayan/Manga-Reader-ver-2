@@ -1,7 +1,7 @@
 # Add project specific ProGuard rules here.
 
 # ================================
-# Extension API (Mihon/Tachiyomi)
+# Extension API 
 # ================================
 # BẮT BUỘC giữ lại nguyên vẹn vì các APK Extension bên thứ 3 compile dựa trên tên gốc của các interface/class này.
 -keep class eu.kanade.tachiyomi.** { *; }

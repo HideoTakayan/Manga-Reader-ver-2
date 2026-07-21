@@ -79,7 +79,7 @@ data class MigrateTargetScreen(val oldMangaId: Long) : Screen {
                 if (oldManga == null) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = com.example.manga_readerver2.ui.theme.PrimaryOrange)
                 } else if (selectedSource == null) {
-                    // Hiển thị danh sách Source
+                    // Kích hoạt giao diện danh mục nguồn truyện (Source List)
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(sources) { source ->
                             ListItem(
@@ -93,7 +93,7 @@ data class MigrateTargetScreen(val oldMangaId: Long) : Screen {
                         }
                     }
                 } else {
-                    // Hiển thị kết quả tìm kiếm
+                    // Hiển thị giao diện kết quả tìm kiếm (Search Results)
                     if (isSearching) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = com.example.manga_readerver2.ui.theme.PrimaryOrange)
                     } else if (searchResults.isEmpty()) {
@@ -126,7 +126,7 @@ data class MigrateTargetScreen(val oldMangaId: Long) : Screen {
                     onConfirm = { copyRead, copyCat, delOld ->
                         screenModel.migrate(selectedTargetManga!!, copyRead, copyCat, delOld)
                         showMigrateDialog = false
-                        // Quay về màn hình chủ
+                        // Điều hướng quay lại màn hình chính (Home Screen)
                         navigator.popUntilRoot()
                     }
                 )

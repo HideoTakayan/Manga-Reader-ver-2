@@ -124,7 +124,7 @@ fun PageImage(
         }
     }
 
-    // Nếu cropBorders bật: decode bitmap và crop viền trắng
+    // Giải mã (decode) bitmap và loại bỏ viền trắng nếu tùy chọn cropBorders được kích hoạt
     var displayModel by remember { mutableStateOf<Any?>(null) }
     LaunchedEffect(model, cropBorders) {
         if (!cropBorders || model == null) {
@@ -140,14 +140,14 @@ fun PageImage(
                         .cropBorders(m)
                     else -> null
                 }
-                cropped ?: model // Fallback về ảnh gốc nếu không crop được
+                cropped ?: model // Khôi phục ảnh gốc làm phương án dự phòng nếu quá trình cắt viền thất bại
             } catch (e: Exception) {
-                model // Fallback
+                model // Phương án dự phòng (Fallback)
             }
         }
     }
 
-    // Tính aspect ratio cho Webtoon mode để xếp ảnh khít nhau
+    // Tính toán tỷ lệ khung hình (aspect ratio) để đồng bộ hóa kích thước và đảm bảo hiển thị liền mạch trên chế độ Webtoon
     var webtoonAspectRatio by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(displayModel) {
         if (displayModel != null) {
@@ -209,6 +209,7 @@ fun PageImage(
                 com.example.manga_readerver2.features.reader.components.SubsamplingImage(
                     displayModel!!,
                     modifier = Modifier.fillMaxSize(),
+                    chapterId = screenModel.currentChapter?.id ?: 0L,
                     scaleMode = if (isWebtoon) 1 else scaleMode,
                     isWebtoon = isWebtoon,
                     onTap = { x, y, w, h ->
@@ -276,7 +277,7 @@ fun ReaderPageContent(
 fun ChapterTransitionPage(screenModel: ReaderScreenModel, transition: ReaderPage.Transition? = null) {
     val chapters by screenModel.chapters.collectAsState()
     val currentChapterId = transition?.chapter?.id ?: screenModel.currentChapter?.id ?: 0L
-    // Sort tăng dần theo số chương (giống Mihon dùng sortDescending=false)
+    // Sort tăng dần theo số chương (tiêu chuẩn dùng sortDescending=false)
     // Index+1 = chương có số lớn hơn = chương tiếp theo cần đọc
     val sortedAsc = remember(chapters) { chapters.sortedBy { it.chapterNumber } }
     val currentIndex = sortedAsc.indexOfFirst { it.id == currentChapterId }
@@ -354,10 +355,10 @@ fun ReaderSystemOverlay(modifier: Modifier = Modifier) {
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         while(true) {
-            // Fix: Dùng BatteryManager API thay vì registerReceiver để tránh SecurityException trên Android 13+
+            // Tích hợp BatteryManager API thay thế cho BroadcastReceiver nhằm tuân thủ chính sách bảo mật (SecurityException) trên hệ điều hành Android 13+
             val batteryManager = context.getSystemService(android.content.Context.BATTERY_SERVICE) as? android.os.BatteryManager
             batteryPercent = batteryManager?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: run {
-                // Fallback cho các thiết bị cũ không hỗ trợ getIntProperty
+                // Kích hoạt cơ chế dự phòng cho các nền tảng hệ điều hành cũ không hỗ trợ phương thức getIntProperty
                 val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 intent?.let { it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / it.getIntExtra(BatteryManager.EXTRA_SCALE, -1) } ?: 0
             }

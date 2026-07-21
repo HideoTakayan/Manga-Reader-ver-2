@@ -96,7 +96,7 @@ class MigrateTargetScreenModel(
             var newMangaId = mangaRepository.getMangaByUrlAndSource(targetManga.url, targetManga.source)?.id
             
             if (newMangaId == null) {
-                // Thêm truyện mới vào DB nếu chưa có
+                // Lưu trữ thông tin truyện vào cơ sở dữ liệu nếu đối tượng chưa tồn tại
                 newMangaId = mangaRepository.insertManga(targetManga)
             }
 
@@ -111,7 +111,7 @@ class MigrateTargetScreenModel(
                     }
                     val networkChapters = targetSource.getChapterList(sManga)
                     
-                    // Thêm các chapters vào DB (đơn giản hóa sync)
+                    // Đẩy danh sách chương vào cơ sở dữ liệu nhằm đồng bộ hóa trạng thái
                     val newChaptersToInsert = mutableListOf<com.example.manga_readerver2.domain.model.Chapter>()
                     networkChapters.forEach { sChapter ->
                         val existingChapter = mangaRepository.getChaptersByMangaId(newMangaId)

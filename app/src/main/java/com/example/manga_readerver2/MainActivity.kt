@@ -98,7 +98,7 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Xin quyền đọc/ghi toàn bộ external storage giống Mihon.
+     * Xin quyền đọc/ghi toàn bộ external storage tiêu chuẩn.
      * - Android 11+ (API 30+): Cần MANAGE_EXTERNAL_STORAGE, dẫn tới trang Settings của hệ thống.
      * - Android 10 trở xuống: Dùng READ_EXTERNAL_STORAGE (đã khai báo trong manifest).
      */

@@ -90,8 +90,8 @@ class VBookEngine(
             override fun jsoupAttr(id: Int, name: String): String {
                 val els = elementsMap[id] ?: return ""
                 if (name == "src" && els.first()?.tagName() == "img") {
-                    // Ưu tiên abs: version để resolve relative URL về absolute
-                    // Filter startsWith("http") để loại bỏ data:image/... placeholder
+                    // Áp dụng định dạng abs: nhằm ưu tiên phân giải các đường dẫn tương đối (Relative URL) thành đường dẫn tuyệt đối (Absolute URL)
+                    // Cấu hình bộ lọc startsWith("http") nhằm loại trừ các dữ liệu placeholder dạng data:image/...
                     val fallback = els.attr("abs:data-src").takeIf { it.startsWith("http") }
                         ?: els.attr("data-src").takeIf { it.isNotBlank() && !it.startsWith("data:") }
                         ?: els.attr("abs:data-original").takeIf { it.startsWith("http") }
@@ -152,7 +152,7 @@ class VBookEngine(
 
         quickJs.evaluate(
             """
-            // Graphics stub – desktop-only API, not available on Android
+            // Triển khai giả lập Graphics (Stub) – Thay thế cho API vốn chỉ khả dụng trên nền tảng Desktop
             var Graphics = {
                 createImage: function(base64) {
                     return { width: 0, height: 0, _base64: base64 };
@@ -397,18 +397,18 @@ class VBookEngine(
                         res
                     } finally {
                         quickJs?.close()
-                        elementsMap.clear() // Prevent memory leak of JSoup Elements
+                        elementsMap.clear() // Giải phóng tài nguyên nhằm ngăn chặn tình trạng rò rỉ bộ nhớ (Memory Leak) đối với các đối tượng JSoup Elements
                     }
                 } catch (e: Exception) {
                     logcat(LogPriority.ERROR) { "JS Error in $functionName: ${e.message}" }
-                    elementsMap.clear() // Prevent memory leak even on error
+                    elementsMap.clear() // Đảm bảo thu hồi tài nguyên chặt chẽ ngay cả khi phát sinh ngoại lệ
                     null
                 }
             }
         }
 
     override fun close() {
-        // No-op. QuickJs is now managed inside execute()
+        // Hàm không thực thi (No-op): Phiên bản QuickJs hiện được quản lý trực tiếp bên trong phạm vi hàm execute()
     }
 
     interface AndroidAppBridge {

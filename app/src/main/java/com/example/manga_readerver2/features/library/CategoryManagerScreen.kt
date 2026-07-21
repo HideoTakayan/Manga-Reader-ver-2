@@ -1,4 +1,4 @@
-﻿package com.example.manga_readerver2.features.library
+package com.example.manga_readerver2.features.library
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,7 +31,7 @@ class CategoryManagerScreen : Screen {
         var newCategoryName by remember { mutableStateOf("") }
 
         Scaffold(
-            containerColor = BackgroundDark,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
                     title = { Text("Chỉnh sửa danh mục", color = Color.White) },
@@ -45,7 +45,7 @@ class CategoryManagerScreen : Screen {
                             Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                 )
             }
         ) { paddingValues ->

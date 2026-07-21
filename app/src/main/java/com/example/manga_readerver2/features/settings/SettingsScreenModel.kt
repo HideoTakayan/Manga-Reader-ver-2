@@ -98,7 +98,7 @@ class SettingsScreenModel : ScreenModel {
         }
     }
 
-    // Backup preview state — hiện dialog trước khi restore
+    // Trạng thái cấu hình bản xem trước dữ liệu (Backup Preview State) - Chịu trách nhiệm hiển thị giao diện xem trước trước khi thực thi phục hồi
     private val _backupPreview = MutableStateFlow<com.example.manga_readerver2.core.backup.model.BackupPreview?>(null)
     val backupPreview: StateFlow<com.example.manga_readerver2.core.backup.model.BackupPreview?> = _backupPreview.asStateFlow()
 

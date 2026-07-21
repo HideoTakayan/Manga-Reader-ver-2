@@ -130,7 +130,7 @@ class MangaRepositoryImpl(
                     var dbManga = mangaQueries.getMangaByUrlAndSource(m.url, m.source).executeAsOne()
                     
                     // Nếu manga đã tồn tại (INSERT OR IGNORE) nhưng chưa có thumbnail,
-                    // cập nhật thumbnail_url mới từ network
+                    // Bổ sung ảnh bìa (thumbnail) nếu bộ truyện hiện tại chưa có dữ liệu này
                     if (!m.thumbnailUrl.isNullOrBlank() && (dbManga.thumbnail_url.isNullOrBlank() || dbManga.thumbnail_url != m.thumbnailUrl)) {
                         mangaQueries.updateMangaThumbnail(m.thumbnailUrl, dbManga._id)
                         dbManga = mangaQueries.getMangaByUrlAndSource(m.url, m.source).executeAsOne()
@@ -271,6 +271,22 @@ class MangaRepositoryImpl(
                 manga_id = chapter.mangaId,
                 url = chapter.url
             )
+        }
+    }
+
+    override suspend fun updateChapterReadStatuses(chapters: List<Chapter>) {
+        withContext<Unit>(Dispatchers.IO) {
+            chapterQueries.transaction {
+                chapters.forEach { chapter ->
+                    chapterQueries.updateChapterReadStatusByUrl(
+                        read = chapter.read,
+                        bookmark = chapter.bookmark,
+                        last_page_read = chapter.lastPageRead,
+                        manga_id = chapter.mangaId,
+                        url = chapter.url
+                    )
+                }
+            }
         }
     }
 
@@ -433,6 +449,18 @@ class MangaRepositoryImpl(
                 sourceStats = sourceStats
             )
         }
+    }
+
+    // Trích xuất thống kê danh sách chương (số lượng đã đọc, bookmark) của toàn bộ thư viện bằng một truy vấn duy nhất
+    override suspend fun getLibraryStats(): Map<Long, Pair<Boolean, Boolean>> = withContext(Dispatchers.IO) {
+        chapterQueries.getLibraryStats()
+            .executeAsList()
+            .associate { row ->
+                row.manga_id to Pair(
+                    row.has_started == 1L,   // hasStarted: đã đọc ít nhất 1 trang
+                    row.has_bookmark == 1L   // hasBookmark: có ít nhất 1 chương được bookmark
+                )
+            }
     }
 
     private fun mapManga(

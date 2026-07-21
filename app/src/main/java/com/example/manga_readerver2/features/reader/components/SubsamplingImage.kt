@@ -31,6 +31,7 @@ import kotlin.math.abs
 fun SubsamplingImage(
     model: Any?,
     modifier: Modifier = Modifier,
+    chapterId: Long = 0L, // Định danh ID của chương hiện tại nhằm ngăn chặn xung đột (race condition) khi xử lý bộ nhớ đệm ảnh
     scaleMode: Int = 0, // 0: Fit Screen, 1: Fit Width, 2: Fit Height
     isWebtoon: Boolean = false,
     onTap: ((x: Float, y: Float, width: Float, height: Float) -> Unit)? = null,
@@ -54,7 +55,7 @@ fun SubsamplingImage(
                     is android.graphics.Bitmap -> ImageSource.bitmap(model)
                     is ByteArray -> {
                         val contentHash = "${java.util.Arrays.hashCode(model)}_${model.size}"
-                        val tempFile = File(context.cacheDir, "reader_page_${contentHash}.tmp")
+                        val tempFile = File(context.cacheDir, "reader_page_${chapterId}_${contentHash}.tmp")
                         if (!tempFile.exists()) tempFile.writeBytes(model)
                         ImageSource.uri(tempFile.absolutePath)
                     }
@@ -93,6 +94,10 @@ fun SubsamplingImage(
                         view.setImage(imageSource!!)
                         lastSource.value = imageSource
                     }
+                },
+                onRelease = { view ->
+                    // Giải phóng tài nguyên native bitmap khi View bị huỷ để tối ưu bộ nhớ
+                    view.recycle()
                 }
             )
         }
@@ -130,7 +135,7 @@ private class ComposeSubsamplingImageView(context: Context) : SubsamplingScaleIm
         val currentCenter = this.center ?: return false
         val sourceLeft = currentCenter.x - (width / 2f) / scale
         val sourceRight = currentCenter.x + (width / 2f) / scale
-        val margin = 2f // Bù sai số làm tròn pixel
+        val margin = 2f // Bù trừ sai số trong quá trình làm tròn hệ số thu phóng (pixel)
         
         return if (direction < 0) { // Cuộn sang trái (vuốt sang phải)
             sourceLeft > margin
@@ -192,7 +197,7 @@ private fun createSubsamplingView(
 
         setOnTouchListener { _, event ->
             tapDetector.onTouchEvent(event)
-            // Tra ve false de nhuong quyen xu ly pan/zoom cho SubsamplingScaleImageView
+            // Trả về false để nhường quyền xử lý cử chỉ (pan/zoom) cho lớp SubsamplingScaleImageView gốc
             false
         }
     }

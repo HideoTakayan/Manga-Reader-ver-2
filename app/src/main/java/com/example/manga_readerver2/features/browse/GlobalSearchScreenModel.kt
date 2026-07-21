@@ -55,9 +55,10 @@ class GlobalSearchScreenModel(
     fun search(query: String) {
         if (query.isBlank()) return
         
-        // Smart Search: Detect URL
+        // Smart Search: Detect if the query is a URL
         if (query.startsWith("http://") || query.startsWith("https://")) {
-            // Logic to open detail directly if source matches (advanced)
+            // Logic to open detail directly if source matches
+            return
         }
 
         searchJob?.cancel()
@@ -66,12 +67,12 @@ class GlobalSearchScreenModel(
         val enabledLangs = sourcePreferences.enabledLanguages.get()
         val allSources = sourceManager.getCatalogueSources()
         
-        // VIP: Chỉ tìm trên các ngôn ngữ đã bật
+        // Yêu cầu quan trọng: Giới hạn phạm vi tìm kiếm theo cấu hình ngôn ngữ đã được kích hoạt
         val sources = allSources.filter { source ->
             enabledLangs.contains("all") || enabledLangs.contains(source.lang)
         }
         
-        // Khởi tạo trạng thái Loading cho các nguồn hợp lệ
+        // Khởi tạo trạng thái chờ xử lý (Loading) cho các danh mục nguồn cấp hợp lệ
         val initialResults = sources.associateWith { GlobalSearchResult.Loading }
         _state.update { it.copy(results = initialResults) }
 

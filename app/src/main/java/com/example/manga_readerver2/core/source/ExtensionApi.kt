@@ -47,7 +47,7 @@ class ExtensionApi {
                 val pluginList = try {
                     json.decodeFromString<VBookExtensionResponse>(responseString).data
                 } catch (e: Exception) {
-                    // Fallback to direct list if it's an older format
+                    // Kích hoạt cơ chế phân tích dự phòng (fallback) đối với định dạng dữ liệu cũ
                     try {
                         json.decodeFromString<List<VBookExtensionItemApi>>(responseString)
                     } catch (e2: Exception) {
@@ -75,7 +75,7 @@ class ExtensionApi {
                                 baseUrl = vbookExtension.source
                             )
                         ),
-                        apkName = vbookExtension.path, // Save the full URL here
+                        apkName = vbookExtension.path, // Cấp phát đường dẫn đầy đủ (Full URL) vào thuộc tính apkName
                         iconUrl = vbookExtension.icon,
                         repoUrl = repoBaseUrl
                     )

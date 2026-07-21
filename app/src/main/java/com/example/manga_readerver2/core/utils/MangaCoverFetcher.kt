@@ -25,7 +25,7 @@ class MangaCoverFetcher(
     override suspend fun fetch(): FetchResult? {
         val source = sourceManager.get(manga.source)
         
-        // 1. Kiểm tra ảnh offline trước (Mihon behavior)
+        // 1. Ưu tiên truy xuất và kiểm tra dữ liệu hình ảnh ngoại tuyến (Offline cache)
         if (source != null) {
             try {
                 val fileManager = Injekt.get<com.example.manga_readerver2.core.utils.FileManager>()
@@ -42,11 +42,11 @@ class MangaCoverFetcher(
                     )
                 }
             } catch (e: Exception) {
-                // Ignore and fallback to network
+                // Bỏ qua ngoại lệ và chuyển hướng xử lý sang nguồn cấp mạng (Network)
             }
         }
 
-        // 2. Fallback to Network
+        // 2. Áp dụng cơ chế truy vấn dữ liệu từ mạng (Network Fallback)
         var url = manga.thumbnailUrl ?: return null
         if (url.startsWith("//")) url = "https:$url"
         if (url.startsWith("http").not()) return null
@@ -65,14 +65,14 @@ class MangaCoverFetcher(
         }
         
         // Inject Referer for JS Extensions:
-        // Phải dùng domain của TRANG TRUYỆN (manga.url) làm Referer,
-        // KHÔNG dùng domain của CDN image URL.
-        // Ví dụ: ảnh từ i200.truyenvua.com cần Referer = https://truyenqqko.com/ (manga site)
+        // Yêu cầu thiết lập domain gốc của trang truyện (manga.url) làm giá trị Referer,
+        // NGHIÊM CẤM sử dụng domain của CDN từ đường dẫn ảnh (Image URL).
+        // Ví dụ: Hình ảnh lưu trữ tại i200.truyenvua.com bắt buộc phải có Referer = https://truyenqqko.com/ (Trang gốc)
         if (!hasReferer) {
             val refererUrl = when {
-                // JS source: lấy Referer từ manga page URL
+                // JS Source: Trích xuất tham số Referer trực tiếp từ đường dẫn trang truyện (manga page URL)
                 jsSource != null && manga.url.startsWith("http") -> manga.url
-                // Fallback cho non-JS source: dùng image URL domain
+                // Cơ chế dự phòng đối với Non-JS Source: Sử dụng domain trực tiếp từ đường dẫn ảnh
                 url.isNotBlank() -> url
                 else -> null
             }

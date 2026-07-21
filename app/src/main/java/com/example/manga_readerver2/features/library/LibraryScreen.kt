@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
@@ -96,9 +97,12 @@ class LibraryScreen : Screen {
             uri?.let { screenModel.importFolder(context, it) }
         }
 
+        val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+
         Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
-            containerColor = BackgroundDark,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 Box {
                     TopAppBar(
@@ -175,14 +179,14 @@ class LibraryScreen : Screen {
                                     text = { Text("Cập nhật thư viện", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
-                                        screenModel.refreshLibrary() // Global Update
+                                        screenModel.refreshLibrary() // Kích hoạt tiến trình đồng bộ toàn cục (Global Update)
                                     }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Cập nhật danh mục", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
-                                        // Refresh current category only
+                                        // Kích hoạt tiến trình đồng bộ phân vùng hiện tại (Category Scope)
                                         screenModel.refreshCategory()
                                     }
                                 )
@@ -206,14 +210,14 @@ class LibraryScreen : Screen {
                                     text = { Text("Nhập tệp truyện (EPUB, PDF, ZIP)", color = Color.White) },
                                     onClick = {
                                         showMoreMenu = false
-                                        // Chỉ chấp nhận EPUB, PDF, ZIP, CBZ để tránh import file không hợp lệ
+                                        // Áp dụng bộ lọc định dạng (EPUB, PDF, ZIP, CBZ) nhằm loại trừ các tập tin không tương thích
                                         importFileLauncher.launch(arrayOf(
                                             "application/epub+zip",
                                             "application/pdf",
                                             "application/zip",
                                             "application/x-cbz",
-                                            "application/octet-stream",  // Fallback cho file không có MIME đúng
-                                            "*/*"  // Giữ lại */* ở cuối vì một số file manager cần
+                                            "application/octet-stream",  // Định dạng dự phòng (Fallback) dành cho tệp tin không xác định được MIME Type
+                                            "*/*"  // Kế thừa đặc quyền wildcard (*/*) nhằm đáp ứng cấu trúc tương thích đối với một số trình quản lý tệp (File Manager)
                                         ))
                                     }
                                 )
@@ -227,10 +231,11 @@ class LibraryScreen : Screen {
                             }
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    scrollBehavior = scrollBehavior
                 )
 
-                // Selection TopBar Overlay
+                // Kích hoạt lớp giao diện phụ (Overlay) trên TopBar trong chế độ đa lựa chọn (Selection Mode)
                 AnimatedVisibility(
                     visible = isSelectionMode,
                     enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
@@ -243,7 +248,7 @@ class LibraryScreen : Screen {
                         onInvertSelection = { screenModel.invertSelection() }
                     )
                 }
-                } // End of topBar Box
+                } // Đóng khối bao bọc (Container) của vùng TopBar
             },
             bottomBar = {
                 AnimatedVisibility(
@@ -343,7 +348,7 @@ class LibraryScreen : Screen {
                     if (categories.isNotEmpty() && !isSearchActive) {
                         ScrollableTabRow(
                             selectedTabIndex = selectedCategoryIndex,
-                            containerColor = BackgroundDark,
+                            containerColor = MaterialTheme.colorScheme.background,
                             contentColor = PrimaryOrange,
                             edgePadding = 16.dp,
                             divider = {},
@@ -432,7 +437,7 @@ fun LibraryContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(mangaList) { item ->
+                items(mangaList, key = { it.manga.id }) { item ->
                     LibraryListItem(
                         item = item, 
                         showDownloadBadges = showDownloadBadges, 
@@ -458,7 +463,7 @@ fun LibraryContent(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(mangaList) { item ->
+                items(mangaList, key = { it.manga.id }) { item ->
                     LibraryGridItem(
                         item = item,
                         displayMode = displayMode,
@@ -534,7 +539,7 @@ fun LibraryGridItem(
                 }
             }
             
-            // Badges
+            // Gắn nhãn chỉ báo (Badges)
             Box(
                 modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
             ) {
@@ -552,7 +557,7 @@ fun LibraryGridItem(
             }
             
             if (displayMode == LibraryDisplayMode.CoverOnlyGrid) {
-                // Gradient overlay for title
+                // Áp dụng lớp phủ chuyển sắc (Gradient Overlay) cho vùng hiển thị tiêu đề
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -673,7 +678,7 @@ fun SelectionTopBar(
     onInvertSelection: () -> Unit
 ) {
     Surface(
-        color = BackgroundDark,
+        color = MaterialTheme.colorScheme.background,
         tonalElevation = 4.dp,
         modifier = Modifier.fillMaxWidth().statusBarsPadding()
     ) {
@@ -692,7 +697,7 @@ fun SelectionTopBar(
                     Icon(Icons.Default.Flip, contentDescription = "Đảo ngược", tint = Color.White)
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
         )
     }
 }

@@ -11,7 +11,7 @@ import uy.kohesive.injekt.api.get
 
 /**
  * PagingSource để hỗ trợ tải danh sách truyện có phân trang (Infinite Scrolling) từ CatalogueSource.
- * Tích hợp lưu trữ truyện vào Database ngay khi tải từ mạng về theo chuẩn Mihon.
+ * Tích hợp lưu trữ truyện vào Database ngay khi tải từ mạng về theo tiêu chuẩn.
  */
 class SourcePagingSource(
     private val source: CatalogueSource,
@@ -56,7 +56,7 @@ class SourcePagingSource(
                 )
             }.filter { seenManga.add(it.url) }
             
-            // Lưu vào DB và lấy ra đối tượng Manga có ID thực tế
+            // Lưu trữ bản ghi vào Cơ sở dữ liệu và truy xuất đối tượng Manga đính kèm định danh (ID) chuẩn xác
             val dbMangaList = mangaRepository.insertNetworkManga(mangaList)
             
             LoadResult.Page(

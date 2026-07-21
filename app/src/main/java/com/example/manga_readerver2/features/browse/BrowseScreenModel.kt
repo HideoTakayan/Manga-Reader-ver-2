@@ -65,7 +65,7 @@ class BrowseScreenModel(
         .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), sourcePreferences.enabledLanguages.get())
 
     init {
-        refreshExtensions() // BUG-6 fix: Khởi tạo fetch data chủ động một lần
+        refreshExtensions() // Khởi tạo load dữ liệu mặc định một lần
         observeRepos()
         observeInstalledExtensions()
     }
@@ -91,8 +91,8 @@ class BrowseScreenModel(
 
     private fun observeRepos() {
         repoRepository.subscribeAll()
-            .drop(1) // BUG-6 fix: Bỏ qua lần phát đầu tiên vì init đã fetch rồi
-            .distinctUntilChanged()  // Fix BUG-17: Không refresh khi data không đổi
+            .drop(1) // Bỏ qua tín hiệu đầu tiên để tránh trùng lặp với quá trình init
+            .distinctUntilChanged()  // Không refresh khi data không đổi
             .onEach { refreshExtensions() }
             .launchIn(screenModelScope)
     }

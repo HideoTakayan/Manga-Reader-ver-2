@@ -47,7 +47,7 @@ class MangaDetailScreenModel(
     private val sourceManager: SourceManager = Injekt.get(),
     private val downloadManager: DownloadManager = Injekt.get(),
     private val downloadCache: com.example.manga_readerver2.core.download.DownloadCache = Injekt.get(),
-    // Fix BUG-13: Inject qua constructor, không gọi Injekt.get() trong hot path của Flow
+    // Cung cấp các dependency thông qua constructor để tối ưu luồng dữ liệu (Flow) thay vì gọi trực tiếp
     private val fileManager: com.example.manga_readerver2.core.utils.FileManager = Injekt.get()
 ) : ScreenModel {
 
@@ -77,6 +77,8 @@ class MangaDetailScreenModel(
 
     private var chapterCollectJob: kotlinx.coroutines.Job? = null
     private val _allChapters = MutableStateFlow<List<Chapter>>(emptyList())
+    // Danh sách chương gốc (chưa qua bộ lọc) dùng để xác định chương tiếp theo cho nút FAB
+    val allChapters: StateFlow<List<Chapter>> = _allChapters.asStateFlow()
     
     val chapters: StateFlow<List<Chapter>> = combine(
         _allChapters, _sortMode, _filterMode
@@ -145,7 +147,7 @@ class MangaDetailScreenModel(
             val m = mangaRepository.getMangaById(mangaId)
 
             if (m == null) {
-                // Không tìm thấy truyện trong DB → thông báo lỗi rõ ràng thay vì blank screen
+                // Hiển thị thông báo nếu không tìm thấy dữ liệu truyện trong cơ sở dữ liệu
                 _errorMessage.value = "Không tìm thấy truyện. Có thể dữ liệu đã bị xóa."
                 _isLoading.value = false
                 return@launch
@@ -156,7 +158,7 @@ class MangaDetailScreenModel(
             _isLiked.value = manga.favorite
             _source.value = sourceManager.get(manga.source)
 
-            // Nếu chưa initialized, tải thêm thông tin từ Source
+            // Kích hoạt tiến trình đồng bộ thông tin chi tiết từ nguồn mạng (Source) nếu dữ liệu chưa được khởi tạo đầy đủ
             if (!manga.initialized) {
                 val source = sourceManager.get(manga.source)
                 if (source != null) {
@@ -178,7 +180,7 @@ class MangaDetailScreenModel(
                             status = networkManga.status.toLong(),
                             initialized = true
                         )
-                        // Dùng updateManga (không phải updateMangaDetails) để lưu cả thumbnailUrl
+                        // Sử dụng phương thức updateManga thay vì updateMangaDetails nhằm bảo toàn dữ liệu ảnh bìa (thumbnailUrl)
                         mangaRepository.updateManga(manga)
                         _manga.value = manga
                     } catch (e: Exception) {
@@ -189,7 +191,7 @@ class MangaDetailScreenModel(
                 }
             }
 
-            // Tải danh sách chương — BUG-7 fix: join child job để _isLoading=false chỉ sau khi fetch xong
+            // Tải danh sách chương - Đợi job hoàn thành trước khi ẩn vòng lặp loading
             val chapterJob = screenModelScope.launch(Dispatchers.IO) {
                 val dbChapters = mangaRepository.getChaptersByMangaId(mangaId)
                 val currentSource = _source.value
@@ -203,7 +205,7 @@ class MangaDetailScreenModel(
                         val networkChapters = withContext(Dispatchers.IO) { currentSource.getChapterList(sManga) }
                         
                         val chapters = networkChapters.mapIndexed { index, networkChapter ->
-                            // Tính chapterNumber giống Mihon (từ tên chương, hoặc từ index nếu không bóc tách được)
+                            // Tính chapterNumber tiêu chuẩn (từ tên chương, hoặc từ index nếu không bóc tách được)
                             val recognizedNumber = com.example.manga_readerver2.core.utils.ChapterRecognition.parseChapterNumber(networkChapter.name)
                             val finalNumber = if (recognizedNumber > -1f) recognizedNumber else (networkChapters.size - index).toFloat()
                             
@@ -261,7 +263,7 @@ class MangaDetailScreenModel(
                 mangaRepository.updateManga(updatedManga)
                 _manga.value = updatedManga
                 
-                // Update chapters — BUG-2 fix: merge với DB để giữ read/bookmark/lastPageRead
+                // Đồng bộ hóa danh sách chương: Tích hợp dữ liệu mạng với cơ sở dữ liệu hiện có nhằm bảo toàn trạng thái đọc (read) và đánh dấu (bookmark)
                 val networkChapters = withContext(Dispatchers.IO) { source.getChapterList(sManga) }
                 
                 // Lấy map chapter hiện tại trong DB theo URL để merge state
@@ -293,7 +295,7 @@ class MangaDetailScreenModel(
                 // Lưu vào DB
                 mangaRepository.insertChapters(mergedChapters)
                 
-                // Cập nhật lại UI state (Không cần gán tay nữa vì Flow đã xử lý tự động)
+                // Giao diện sẽ tự động phản hồi lại sự thay đổi của cơ sở dữ liệu thông qua Flow
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR) { "Lỗi khi refresh chi tiết truyện: ${e.message}" }
                 _errorMessage.value = "Lỗi làm mới dữ liệu: ${e.message}"
@@ -346,7 +348,7 @@ class MangaDetailScreenModel(
             DownloadAction.ALL_CHAPTERS -> chapters
         }
 
-        // Lọc bớt những chương đã tải
+        // Loại bỏ các chương đã được tải về khỏi danh sách chờ
         val notDownloaded = chaptersToDownload.filter { chapter ->
             !downloadCache.isChapterDownloaded(m.id, chapter.name)
         }
@@ -358,8 +360,8 @@ class MangaDetailScreenModel(
 
     private fun getNextUnreadChapters(chapters: List<Chapter>, count: Int): List<Chapter> {
         // chapters đang được sort theo DESC (mới nhất ở trên)
-        // Để lấy "Tiếp theo", ta cần tìm chương chưa đọc cũ nhất, và lấy từ đó đi lên.
-        // Tức là ta sẽ lật ngược list thành ASC, tìm chương chưa đọc đầu tiên, rồi take(count)
+        // Thuật toán đề xuất chương tiếp theo: Xác định chương chưa đọc có thời gian phát hành cũ nhất
+        // (Đảo ngược danh sách thành thứ tự tăng dần, định vị chương chưa đọc đầu tiên và giới hạn số lượng trả về)
         return chapters.reversed().filter { !it.read }.take(count)
     }
 

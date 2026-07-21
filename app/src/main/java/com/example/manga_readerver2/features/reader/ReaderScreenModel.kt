@@ -196,7 +196,7 @@ class ReaderScreenModel(
     private val zipFiles = mutableMapOf<String, java.util.zip.ZipFile>()
     private val pdfRenderers = mutableMapOf<String, android.graphics.pdf.PdfRenderer>()
     private val pdfFileDescriptors = mutableMapOf<String, android.os.ParcelFileDescriptor>()
-    // Track page load jobs để cancel khi chuyển chapter tránh hiển thị ảnh sai
+    // Theo dõi tiến trình tải trang để có thể hủy khi chuyển sang chương khác, tránh lỗi hiển thị hình ảnh không đồng bộ
     private val pageLoadJobs = mutableMapOf<Int, kotlinx.coroutines.Job>()
     private val zipMutex = kotlinx.coroutines.sync.Mutex()
     private var chapterLoadJob: kotlinx.coroutines.Job? = null
@@ -238,7 +238,7 @@ class ReaderScreenModel(
             readerPreferences.cropBorders.asFlow().collect { _cropBorders.value = it }
         }
         
-        // Fix BUG-07: Tự động chuyển chương khi TTS đọc hết
+        // Điều hướng đến chương tiếp theo khi hệ thống Text-to-Speech (TTS) hoàn tất việc đọc chương hiện tại
         screenModelScope.launch {
             ttsManager.onComplete.collect {
                 loadNextChapter()
@@ -348,11 +348,11 @@ class ReaderScreenModel(
         // Stop TTS when loading new chapter
         ttsManager.stop()
 
-        // Cancel tất cả page load jobs của chapter cũ để tránh ghi đè dữ liệu chapter mới
+        // Hủy các tiến trình tải trang đang chạy của chương cũ để ngăn chặn việc ghi đè lên dữ liệu của chương mới
         pageLoadJobs.values.forEach { it.cancel() }
         pageLoadJobs.clear()
 
-        // Fix R5: Dọn dẹp cache online ảnh của chapter cũ trước khi load chapter mới
+        // Xóa dữ liệu bộ đệm (cache) ảnh của chương trước đó để giải phóng bộ nhớ trước khi tải chương mới
         screenModelScope.launch(Dispatchers.IO) {
             try {
                 context.cacheDir.listFiles()?.filter { 
@@ -499,9 +499,9 @@ class ReaderScreenModel(
         return emptyList()
     }
 
-    // Fix R2: Thêm suspend parameter để sử dụng được với mutex (vì zipMutex là coroutine mutex)
-    // Hoặc sửa thành synchronized lock nếu không muốn suspend.
-    // Vì ArchiveReader.getPageStream không suspend, ta dùng synchronized object cho đơn giản và hiệu quả.
+    // Khai báo hàm dưới dạng suspend để có thể chạy tuần tự với hệ thống Mutex của Coroutine
+    // Tuy nhiên, do ArchiveReader.getPageStream không phải là hàm suspend nên ta sử dụng
+    // khối đồng bộ hóa (synchronized block) để đảm bảo an toàn luồng (thread-safe) một cách đơn giản nhất.
     private val zipLock = Any()
     private val pdfLock = Any()
     
@@ -522,7 +522,7 @@ class ReaderScreenModel(
             // PdfRenderer không thread-safe → dùng synchronized lock
             synchronized(pdfLock) {
                 val renderer = pdfRenderers[page.file.absolutePath] ?: return@synchronized null
-                val cacheFile = File(context.cacheDir, "pdf_${page.file.absolutePath.hashCode()}_${page.pageIndex}.jpg")
+                val cacheFile = File(context.cacheDir, "pdf_${chapterId}_${page.file.absolutePath.hashCode()}_${page.pageIndex}.jpg")
                 if (cacheFile.exists()) return@synchronized cacheFile.absolutePath
 
                 // Kiểm tra pageIndex hợp lệ để tránh IllegalArgumentException
@@ -598,10 +598,10 @@ class ReaderScreenModel(
         val timeDiff = now - lastSavedTime
         if (localIndex == lastSavedPageIndex && timeDiff < 5000) return 
 
-        // BUG-3 fix: Dùng screenModelScope thay vì GlobalScope
+        // Sử dụng screenModelScope để quản lý vòng đời an toàn hơn thay vì GlobalScope
         screenModelScope.launch(Dispatchers.IO) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                // Cập nhật lịch sử đọc
+                // Đồng bộ hóa dữ liệu lịch sử đọc (Read History) vào cơ sở dữ liệu
                 val timeRead = if (startTime > 0) now - startTime else 0L
                 if (timeRead > 0 || localIndex != lastSavedPageIndex) {
                     mangaRepository.upsertHistory(cId, now, timeRead)
@@ -610,7 +610,7 @@ class ReaderScreenModel(
                     lastSavedPageIndex = localIndex
                 }
 
-                // Cập nhật trang cuối cùng trong bản ghi chapter
+                // Lưu vết chỉ mục trang hiển thị cuối cùng (lastPageRead) của chương hiện tại
                 if (localIndex >= 0 && chapter != null) {
                     val isRead = totalPages > 0 && localIndex >= totalPages - 1
                     mangaRepository.updateChapter(chapter.copy(
@@ -777,14 +777,14 @@ class ReaderScreenModel(
     }
 
     /**
-     * Tải link ảnh thực tế cho trang online (Hỗ trợ getImageUrl 2 bước như Mihon)
+     * Tải link ảnh thực tế cho trang online (Hỗ trợ getImageUrl 2 bước tiêu chuẩn)
      */
     fun loadPage(index: Int) {
         val pages = _allPages.value
         if (index !in pages.indices) return
         val page = pages[index] as? ReaderPage.Online ?: return
 
-        // Bỏ qua nếu đã tải xong hoặc đang tải
+        // Từ chối thực thi tác vụ nếu dữ liệu trang đã tồn tại trong bộ đệm hoặc tiến trình tải đang diễn ra
         if (page.localFile != null || page.isLoading) return
 
         // Cancel job cũ nếu có (tránh duplicate request)
@@ -803,7 +803,7 @@ class ReaderScreenModel(
                 val source = sourceManager.get(manga.source) as? CatalogueSource ?: return@launch
 
                 val sChapter = eu.kanade.tachiyomi.source.model.SChapter.create().apply {
-                    // Fix: lấy URL từ page.chapter thay vì currentChapter để đúng khi continuous scroll
+                    // lấy URL từ page.chapter thay vì currentChapter để đúng khi continuous scroll
                     val chapter = page.chapter ?: currentChapter
                     url = chapter?.url ?: ""
                     name = chapter?.name ?: ""
@@ -818,7 +818,7 @@ class ReaderScreenModel(
                 } else page.url
 
                 if (imageUrl.isEmpty()) {
-                    // Cập nhật state: không còn loading
+                    // Cập nhật trạng thái (State) nhằm chấm dứt vòng lặp chờ tải dữ liệu
                     val updatedPages = _allPages.value.toMutableList()
                     if (index in updatedPages.indices) {
                         (updatedPages[index] as? ReaderPage.Online)?.let {
@@ -830,7 +830,7 @@ class ReaderScreenModel(
                 }
 
                 // 2. Download ảnh với headers của source
-                // Fix: JsSource không phải HttpSource → phải check riêng để lấy đúng client và headers
+                // JsSource không phải HttpSource → phải check riêng để lấy đúng client và headers
                 val httpSource = source as? HttpSource
                 val jsSource = source as? com.example.manga_readerver2.source_js.JsSource
                 val networkHelper = uy.kohesive.injekt.Injekt.get<eu.kanade.tachiyomi.network.NetworkHelper>()
@@ -885,7 +885,7 @@ class ReaderScreenModel(
                     }
                 }
 
-                // Fix: Dùng copy() thay vì mutate trực tiếp để StateFlow trigger recompose đúng
+                // Khởi tạo bản sao cấu trúc dữ liệu bằng copy() thay vì thay đổi trực tiếp (mutate) nhằm bảo đảm tín hiệu StateFlow kích hoạt quá trình tái thiết lập giao diện (recompose) chính xác
                 val finalPages = _allPages.value.toMutableList()
                 if (index in finalPages.indices) {
                     (finalPages[index] as? ReaderPage.Online)?.let {
@@ -917,7 +917,7 @@ class ReaderScreenModel(
     fun getSourceHeaders(): okhttp3.Headers? {
         val mangaSource = manga?.source ?: return null
         val source = sourceManager.get(mangaSource) ?: return null
-        // Fix: JsSource không kế thừa HttpSource nên phải check cả hai
+        // JsSource không kế thừa HttpSource nên phải check cả hai
         var headers = when (source) {
             is eu.kanade.tachiyomi.source.online.HttpSource -> source.headers
             is com.example.manga_readerver2.source_js.JsSource -> source.headers
@@ -948,7 +948,7 @@ class ReaderScreenModel(
         if (blocks.isEmpty()) return
         val paragraphs = blocks.map { it.text }
         
-        // Fix R4: Ưu tiên dùng pausedAtIndex từ TtsManager
+        // Ưu tiên dùng pausedAtIndex từ TtsManager
         val startIndex = if (ttsManager.pausedAtIndex >= 0) 
             ttsManager.pausedAtIndex 
         else 
@@ -1043,18 +1043,22 @@ class ReaderScreenModel(
         pdfFileDescriptors.clear()
         super.onDispose()
         
-        // Dọn dẹp cache trang PDF và ảnh online bằng GlobalScope để không bị hủy giữa chừng khi Screen đóng
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        // Dọn dẹp cache trang PDF và ảnh online theo chapterId để không xóa nhầm cache của chương khác đang mở
+        val closedChapterId = this.chapterId
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Xóa ảnh render PDF, ảnh online tạm, và các cache reader
+                // Chỉ xóa ảnh thuộc về chapterId vừa đóng
                 context.cacheDir.listFiles()?.filter { 
-                    it.name.startsWith("pdf_") || it.name.startsWith("online_") || it.name.startsWith("reader_page_") || it.name.startsWith("cbz_")
+                    it.name.startsWith("pdf_${closedChapterId}_") || 
+                    it.name.startsWith("online_${closedChapterId}_") || 
+                    it.name.startsWith("reader_page_${closedChapterId}_")
                 }?.forEach { 
                     it.delete()
                 }
                 
+                // cbz_temp không còn được sử dụng cho chapter cụ thể, dọn dẹp an toàn
                 val tempDir = File(context.cacheDir, "cbz_temp")
-                if (tempDir.exists()) {
+                if (tempDir.exists() && tempDir.list()?.isEmpty() == true) {
                     tempDir.deleteRecursively()
                 }
             } catch (e: Exception) {

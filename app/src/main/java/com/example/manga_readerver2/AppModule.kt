@@ -84,7 +84,7 @@ class AppModule(val app: Application) : InjektModule {
             MangaRepositoryImpl(get())
         }
 
-        // --- Extension System (Mihon Style) ---
+        // Cấu hình hệ thống thành phần mở rộng (Extension System)
         addSingletonFactory {
             PreferenceStore(app)
         }

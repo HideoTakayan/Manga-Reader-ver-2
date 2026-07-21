@@ -32,14 +32,14 @@ class UpdatesScreenModel(
     private val _updates = MutableStateFlow<List<Update>>(emptyList())
     val updates: StateFlow<List<Update>> = _updates.asStateFlow()
 
-    // Chế độ chọn nhiều
+    // Kích hoạt trạng thái đa lựa chọn (Multi-selection Mode)
     private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedIds: StateFlow<Set<Long>> = _selectedIds.asStateFlow()
 
     val isSelectionMode: StateFlow<Boolean> = _selectedIds.map { it.isNotEmpty() }
         .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    // Thời gian cập nhật cuối
+    // Cấu hình thời điểm đồng bộ hóa gần nhất (Last Updated Time)
     private val _lastUpdated = MutableStateFlow(0L)
     val lastUpdated: StateFlow<Long> = _lastUpdated.asStateFlow()
 
@@ -84,7 +84,7 @@ class UpdatesScreenModel(
         WorkManager.getInstance(context).enqueue(request)
     }
 
-    // ── Selection ────────────────────────────────────────────────
+    // Module xử lý thao tác lựa chọn (Selection Module)─
     fun toggleSelection(chapterId: Long) {
         _selectedIds.update { current ->
             if (chapterId in current) current - chapterId else current + chapterId
@@ -99,7 +99,7 @@ class UpdatesScreenModel(
         _selectedIds.value = emptySet()
     }
 
-    // ── Actions ──────────────────────────────────────────────────
+    // Module xử lý tác vụ (Action Module)─
     fun markAllRead() {
         screenModelScope.launch {
             _updates.value
@@ -140,7 +140,7 @@ class UpdatesScreenModel(
     }
 
     fun deleteDownloadSelected() {
-        // Placeholder: xóa tải về cần DownloadCache.deleteChapter - sẽ implement sau
+        // Trạng thái chờ (Placeholder): Yêu cầu tích hợp DownloadCache.deleteChapter để xử lý tác vụ xóa bản ghi tải xuống
         clearSelection()
     }
 

@@ -18,13 +18,13 @@ class MigrateMangaUseCase(
         val oldManga = mangaRepository.getMangaById(oldMangaId) ?: return
         val newManga = mangaRepository.getMangaById(newMangaId) ?: return
 
-        // 1. Đặt newManga làm favorite
+        // 1. Cấp quyền truy cập thư viện (Favorite) cho nguồn truyện mới
         mangaRepository.updateMangaFavorite(newMangaId, true)
 
         val oldChapters = mangaRepository.getChaptersByMangaId(oldMangaId)
         val newChapters = mangaRepository.getChaptersByMangaId(newMangaId)
 
-        // 2. Chuyển trạng thái đọc
+        // 2. Đồng bộ hóa trạng thái tiến trình đọc (Read Status)
         if (copyReadStatus) {
             val maxReadChapter = oldChapters.filter { it.read }.maxOfOrNull { it.chapterNumber } ?: -1f
 
@@ -55,7 +55,7 @@ class MigrateMangaUseCase(
             }
         }
 
-        // 3. Chuyển Categories
+        // 3. Kế thừa siêu dữ liệu phân loại (Categories)
         if (copyCategories) {
             val oldCategoryIds = mangaRepository.getMangaCategoryIds(oldMangaId)
             oldCategoryIds.forEach { catId ->
@@ -63,7 +63,7 @@ class MigrateMangaUseCase(
             }
         }
 
-        // 4. Xóa cũ
+        // 4. Giải phóng tài nguyên tham chiếu nguồn truyện cũ
         if (removeOldManga) {
             mangaRepository.updateMangaFavorite(oldMangaId, false)
             mangaRepository.removeAllCategoriesFromManga(oldMangaId)

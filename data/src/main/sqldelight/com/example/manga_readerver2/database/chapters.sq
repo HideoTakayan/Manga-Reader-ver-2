@@ -63,3 +63,13 @@ LIMIT 50;
 
 getTotalReadChapters:
 SELECT COUNT(*) FROM chapters WHERE read = 1;
+
+-- Trích xuất thống kê (đã đọc, bookmark) của tất cả các truyện trong thư viện bằng một câu lệnh duy nhất
+-- Giải pháp này loại bỏ vấn đề lặp truy vấn cơ sở dữ liệu trên từng bộ truyện riêng lẻ
+getLibraryStats:
+SELECT
+    manga_id,
+    MAX(CASE WHEN read = 1 OR last_page_read > 0 THEN 1 ELSE 0 END) AS has_started,
+    MAX(CASE WHEN bookmark = 1 THEN 1 ELSE 0 END) AS has_bookmark
+FROM chapters
+GROUP BY manga_id;

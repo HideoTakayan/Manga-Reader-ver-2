@@ -143,6 +143,8 @@ fun ReaderMainContent(
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showTtsPlayer by remember { mutableStateOf(false) }
     var showTtsSettings by remember { mutableStateOf(false) }
+    // Cờ trạng thái để kiểm soát sự kiện chạm màn hình (tap) khi người dùng đang tương tác với thanh trượt (slider)
+    var isSeeking by remember { mutableStateOf(false) }
 
     val window = activity?.window
     LaunchedEffect(showControls) {
@@ -254,6 +256,10 @@ fun ReaderMainContent(
     val handleTap: (Float, Float, Float, Float) -> Unit = { x, y, width, height ->
         if (isAutoScrolling) {
             isAutoScrolling = false
+        } else if (isSeeking) {
+            // Tạm thời vô hiệu hóa thao tác chạm để tránh nhảy trang ngoài ý muốn sau khi thao tác trên thanh trượt
+            // do hệ thống có thể nhận diện sai thao tác thả tay (pointer up) thành một thao tác chạm (tap)
+            isSeeking = false
         } else {
             val col = (x / (width / 3)).toInt().coerceIn(0, 2)
             val row = (y / (height / 3)).toInt().coerceIn(0, 2)
@@ -418,7 +424,25 @@ fun ReaderMainContent(
                         if (!isTextReader) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("Trước", color = TextSecondary, fontSize = 12.sp)
-                                Slider(value = (currentPage + 1).toFloat(), onValueChange = { screenModel.setPage(it.toInt() - 1) }, valueRange = 1f..(pageCount.coerceAtLeast(1).toFloat()), modifier = Modifier.weight(1f).padding(horizontal = 8.dp), colors = SliderDefaults.colors(thumbColor = PrimaryOrange, activeTrackColor = PrimaryOrange))
+                                Slider(
+                                    value = (currentPage + 1).toFloat(),
+                                    onValueChange = {
+                                        // Bật cờ trạng thái để chặn các sự kiện chạm khác khi người dùng đang kéo thanh trượt
+                                        isSeeking = true
+                                        screenModel.setPage(it.toInt() - 1)
+                                    },
+                                    onValueChangeFinished = {
+                                        // Duy trì trạng thái khóa thêm một khoảng thời gian ngắn sau khi nhả tay,
+                                        // nhằm ngăn chặn xung đột giữa thao tác thả tay và thao tác chạm màn hình.
+                                        coroutineScope.launch {
+                                            delay(200)
+                                            isSeeking = false
+                                        }
+                                    },
+                                    valueRange = 1f..(pageCount.coerceAtLeast(1).toFloat()),
+                                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                                    colors = SliderDefaults.colors(thumbColor = PrimaryOrange, activeTrackColor = PrimaryOrange)
+                                )
                                 Text("Tiếp", color = TextSecondary, fontSize = 12.sp)
                             }
                         }

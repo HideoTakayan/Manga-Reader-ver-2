@@ -18,7 +18,7 @@ object JsLoader {
 
     private val json = Json {
         ignoreUnknownKeys = true
-        // Cần thiết: VBook plugin.json dùng "version": 14 (Int) nhưng model dự kiến String
+        // Lưu ý: Tệp plugin.json sử dụng định dạng Int cho thuộc tính "version", trong khi Model yêu cầu String. Quá trình tiền xử lý được áp dụng để đồng bộ kiểu dữ liệu.
         coerceInputValues = true
         isLenient = true
     }
@@ -46,7 +46,7 @@ object JsLoader {
 
         return try {
             val rawText = pluginJsonFile.readText()
-            // Fix: kotlinx.serialization crashes on trailing commas. Clean them up manually.
+            // kotlinx.serialization crashes on trailing commas. Clean them up manually.
             val configText = rawText.replace(Regex(",(?=\\s*[}\\]])"), "")
             val config = json.decodeFromString<PluginConfig>(configText)
             
@@ -83,7 +83,7 @@ object JsLoader {
             readScript(config.script.toc, "toc")
             readScript(config.script.chap, "chap")
 
-            // Kiểm tra các script bắt buộc: toc + chap
+            // Xác minh tính toàn vẹn của các tập lệnh cốt lõi (toc và chap)
             val mandatoryScripts = listOf("toc", "chap")
             val missingScripts = mandatoryScripts.filter { !scripts.containsKey(it) }
             if (missingScripts.isNotEmpty()) {
@@ -107,8 +107,8 @@ object JsLoader {
             // Ưu tiên locale, fallback language, cuối cùng là all.
             val lang = normalizeLang(config.metadata.locale ?: config.metadata.language)
 
-            // Fix: ID phải khớp với ExtensionApi.sourceId formula
-            // Dùng cùng offset 0x5642000000000000L ("VB" in hex) và cùng input hash
+            // ID phải khớp với ExtensionApi.sourceId formula
+            // Tính toán mã định danh bằng cách kết hợp hàm băm với giá trị bù trừ chuẩn (offset 0x5642000000000000L)
             val sourceId = 0x5642000000000000L or
                 ((config.metadata.name + lang).hashCode().toLong() and 0xFFFFFFFFL)
 
@@ -155,6 +155,6 @@ data class JsExtensionInfo(
     val versionCode: Long,
     val isNsfw: Boolean,
     val author: String?,
-    val isNovel: Boolean = true,  // VBook default là novel; comic type sẽ false
+    val isNovel: Boolean = true,  // Tham số định cấu hình loại nội dung (mặc định là tiểu thuyết)
     val icon: android.graphics.drawable.Drawable? = null
 )

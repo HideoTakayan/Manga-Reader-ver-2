@@ -20,14 +20,14 @@ class ExtensionRepoService {
     suspend fun fetchRepoDetails(repo: String): ExtensionRepo? {
         return withContext(Dispatchers.IO) {
             try {
-                // Kiểm tra xem URL có trỏ thẳng tới file json không
+                // Xác minh xem URL có dẫn trực tiếp đến tệp tin JSON hay không
                 val isDirectJson = repo.endsWith(".json", ignoreCase = true)
                 
                 if (isDirectJson) {
                     val response = client.newCall(GET(repo)).execute()
                     if (response.isSuccessful) {
                         val responseBody = response.body?.string() ?: ""
-                        // Thử parse Mihon
+                        // Tiến hành phân tích cú pháp JSON (Parse)
                         try {
                             val meta = json.decodeFromString<ExtensionRepoDto>(responseBody).meta
                             return@withContext ExtensionRepo(
@@ -39,7 +39,7 @@ class ExtensionRepoService {
                             )
                         } catch (e: Exception) {}
                         
-                        // Coi như là JS Repo (VBook)
+                        // Áp dụng định dạng kho lưu trữ JS (VBook)
                         return@withContext ExtensionRepo(
                             baseUrl = repo,
                             name = "VBook Extensions",
@@ -51,7 +51,7 @@ class ExtensionRepoService {
                     return@withContext null
                 }
 
-                // Nếu là Base URL, thử fetch repo.json (Định dạng Mihon)
+                // Đối với Base URL, tiến hành truy xuất tệp repo.json theo định dạng chuẩn
                 val mihonResponse = client.newCall(GET("$repo/repo.json")).execute()
                 if (mihonResponse.isSuccessful) {
                     val meta = mihonResponse.parseAs<ExtensionRepoDto>(json).meta
@@ -64,7 +64,7 @@ class ExtensionRepoService {
                     )
                 }
 
-                // Nếu không thành công, thử fetch plugin.json (Định dạng vBook JS)
+                // Trong trường hợp truy xuất thất bại, chuyển hướng truy xuất tệp plugin.json (định dạng vBook JS) làm phương án thay thế
                 val vbookResponse = client.newCall(GET("$repo/plugin.json")).execute()
                 if (vbookResponse.isSuccessful) {
                     return@withContext ExtensionRepo(

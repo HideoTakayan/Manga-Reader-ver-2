@@ -29,7 +29,7 @@ class FileManager(private val context: Context) {
         val dir = File(getRootPath(), "downloads")
         if (!dir.exists()) {
             dir.mkdirs()
-            // Ẩn khỏi Gallery
+            // Ẩn nội dung khỏi các ứng dụng trình chiếu phương tiện (Media Gallery)
             File(dir, ".nomedia").createNewFile()
         }
         return dir

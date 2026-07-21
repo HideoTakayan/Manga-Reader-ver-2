@@ -71,7 +71,7 @@ class StatisticsScreenModel(
                     SourceStat(sourceName, stat.count, if (totalSources > 0) stat.count.toFloat() / totalSources else 0f)
                 }.sortedByDescending { it.count }.take(10)
 
-                // Tính toán thống kê thể loại (Genres)
+                // Tổng hợp và phân tích số liệu thống kê theo thể loại truyện (Genres)
                 val genreCounts = mutableMapOf<String, Int>()
                 var totalGenres = 0
                 library.forEach { libManga ->
@@ -88,7 +88,7 @@ class StatisticsScreenModel(
                     GenreStat(name, count, if (totalGenres > 0) count.toFloat() / totalGenres else 0f)
                 }.sortedByDescending { it.count }.take(10) // Lấy top 10 thể loại
 
-                // Tính số chapter đọc mỗi ngày trong 7 ngày gần nhất
+                // Phân tích tần suất đọc (số chương) trên từng ngày trong chu kỳ 7 ngày gần nhất
                 val now = Calendar.getInstance()
                 val dayFormat = SimpleDateFormat("EEE", Locale("vi"))
                 val weeklyCount = IntArray(7)
@@ -104,7 +104,7 @@ class StatisticsScreenModel(
                     }
                 }
 
-                // Tính reading streak — nhóm history theo ngày
+                // Xác định chuỗi ngày đọc liên tục (Reading Streak) thông qua việc nhóm lịch sử theo ngày
                 val dayMs = TimeUnit.DAYS.toMillis(1)
                 val readDays = history
                     .map { TimeUnit.MILLISECONDS.toDays(it.lastRead) } // epoch day
@@ -115,7 +115,7 @@ class StatisticsScreenModel(
                 var streak = 0
                 val todayDay = TimeUnit.MILLISECONDS.toDays(now.timeInMillis)
 
-                // Tính longest streak
+                // Truy xuất chuỗi ngày đọc dài nhất (Longest Streak)
                 var prevDay = -2L
                 for (day in readDays) {
                     streak = if (day == prevDay + 1) streak + 1 else 1
@@ -123,14 +123,14 @@ class StatisticsScreenModel(
                     prevDay = day
                 }
 
-                // Tính current streak (từ hôm nay lùi về)
+                // Xác định chuỗi đọc hiện tại (tính lùi từ thời điểm hiện tại)
                 currentStreak = 0
                 var checkDay = todayDay
                 while (readDays.contains(checkDay)) {
                     currentStreak++
                     checkDay--
                 }
-                // Nếu hôm nay chưa đọc, thử tính từ hôm qua
+                // Áp dụng cơ chế tính toán dự phòng từ ngày hôm trước nếu chưa phát sinh dữ liệu đọc trong ngày hôm nay
                 if (currentStreak == 0) {
                     checkDay = todayDay - 1
                     while (readDays.contains(checkDay)) {

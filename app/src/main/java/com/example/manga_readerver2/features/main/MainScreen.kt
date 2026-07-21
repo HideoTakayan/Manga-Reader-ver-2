@@ -23,7 +23,7 @@ class MainScreen : Screen {
     override fun Content() {
         TabNavigator(LibraryTab) {
             Scaffold(
-                containerColor = BackgroundDark,
+                containerColor = MaterialTheme.colorScheme.background,
                 bottomBar = {
                     NavigationBar(
                         containerColor = Color(0xFF0E0E10),

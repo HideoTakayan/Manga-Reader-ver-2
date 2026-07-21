@@ -29,7 +29,7 @@ object LibraryUpdateJob {
 
         val request = PeriodicWorkRequestBuilder<LibraryUpdateWorker>(
             prefInterval.toLong(), TimeUnit.HOURS,
-            15, TimeUnit.MINUTES // Flex interval
+            15, TimeUnit.MINUTES // Cấu hình Flex Interval (thời gian tối đa chờ đợi để đồng bộ chu kỳ)
         )
             .addTag(LibraryUpdateWorker.TAG)
             .setConstraints(constraints)
@@ -37,7 +37,7 @@ object LibraryUpdateJob {
 
         workManager.enqueueUniquePeriodicWork(
             LibraryUpdateWorker.TAG,
-            ExistingPeriodicWorkPolicy.UPDATE, // Thay bằng KEEP/REPLACE ở phiên bản WorkManager cũ, dùng UPDATE cho 2.9.0
+            ExistingPeriodicWorkPolicy.UPDATE, // Kích hoạt chính sách UPDATE thay thế cho KEEP/REPLACE nhằm tương thích chuẩn WorkManager 2.9.0+
             request
         )
         

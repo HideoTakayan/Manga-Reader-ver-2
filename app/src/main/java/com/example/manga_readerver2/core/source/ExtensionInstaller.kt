@@ -61,7 +61,7 @@ class ExtensionInstaller(private val context: Context) {
                         config.script.toc?.let { scriptsToDownload.add(it) }
                         config.script.chap?.let { scriptsToDownload.add(it) }
                     } else {
-                        // Fallback using JSONObject if parsing failed for some reason
+                        // Kích hoạt phân tích dự phòng qua JSONObject trong trường hợp quá trình parse ban đầu phát sinh ngoại lệ
                         val jsonObject = org.json.JSONObject(pluginJsonText)
                         val scriptObj = jsonObject.optJSONObject("script")
                         if (scriptObj != null) {
@@ -72,7 +72,7 @@ class ExtensionInstaller(private val context: Context) {
                         }
                     }
 
-                    // Always attempt to download standard VBook src/ files if not explicitly added
+                    // Chủ động tiến hành tải các tệp tin lõi (src/) theo chuẩn VBook nếu chưa được tích hợp sẵn
                     val standardScripts = listOf("src/home.js", "src/detail.js", "src/toc.js", "src/chap.js", "src/search.js", "src/genre.js", "src/page.js")
                     scriptsToDownload.addAll(standardScripts)
 
@@ -87,7 +87,7 @@ class ExtensionInstaller(private val context: Context) {
                         }
                     }
 
-                    // Download icon if any
+                    // Đồng bộ tệp tin biểu tượng (icon) nếu có
                     val iconRequest = Request.Builder().url("$baseUrl/icon.png").build()
                     val iconResponse = httpClient.newCall(iconRequest).execute()
                     if (iconResponse.isSuccessful) {
@@ -95,7 +95,7 @@ class ExtensionInstaller(private val context: Context) {
                     }
 
                     step.value = InstallStep.Installed
-                    // Trigger refresh via ExtensionManager (since it's not a ZIP anymore)
+                    // Kích hoạt tiến trình làm mới (refresh) thông qua ExtensionManager đối với định dạng thư mục phân rã
                     Injekt.get<ExtensionManager>().refreshInstalledExtensions()
                 } catch (e: Exception) {
                     logcat.logcat("ExtensionInstaller", logcat.LogPriority.ERROR) { "Lỗi tải JS extension: ${e.message}" }
@@ -133,17 +133,17 @@ class ExtensionInstaller(private val context: Context) {
                     logcat.logcat("ExtensionInstaller", logcat.LogPriority.INFO) {
                         "[INSTALL] Đã giải nén ZIP vào: ${destDir.absolutePath}"
                     }
-                    // Verify plugin.json exists after extraction
+                    // Xác minh sự tồn tại của tệp plugin.json sau khi quá trình giải nén hoàn tất
                     val pluginJson = File(destDir, "plugin.json")
                     if (!pluginJson.exists()) {
-                        // Check nested subdirectory (GitHub ZIP wraps in a root folder)
+                        // Rà soát kiến trúc thư mục con (xử lý tình trạng mã nguồn từ GitHub thường được bao bọc trong một root folder ảo)
                         val subDirs = destDir.listFiles { f -> f.isDirectory }
                         val nested = subDirs?.firstOrNull { File(it, "plugin.json").exists() }
                         if (nested != null) {
                             logcat.logcat("ExtensionInstaller", logcat.LogPriority.WARN) {
                                 "[INSTALL] plugin.json nằm trong subfolder: ${nested.name}. Sẽ di chuyển lên thư mục gốc."
                             }
-                            // Move nested contents up to destDir
+                            // Dịch chuyển toàn bộ cấu trúc thư mục con lên cấp thư mục đích (destDir)
                             nested.listFiles()?.forEach { file ->
                                 file.copyRecursively(File(destDir, file.name), overwrite = true)
                             }
@@ -197,11 +197,11 @@ class ExtensionInstaller(private val context: Context) {
                 var entry = zis.nextEntry
                 while (entry != null) {
                     entryCount++
-                    // Loại bỏ root folder nếu có (GitHub ZIP style: "truyenfull-main/plugin.json")
+                    // Xử lý lược bỏ thư mục gốc dư thừa (Ví dụ: Định dạng nén từ GitHub thường có dạng "repository-main/plugin.json")
                     val entryName = entry.name.let { name ->
                         val parts = name.split("/")
                         if (parts.size > 1 && parts[0].isNotEmpty() && !name.startsWith("src/") && !name.startsWith("plugin")) {
-                            // Check if first part looks like a root folder (not a known file/dir)
+                            // Phân tích và xác định liệu thành phần đầu tiên của đường dẫn có phải là thư mục gốc dư thừa hay không
                             parts.drop(1).joinToString("/")
                         } else {
                             name

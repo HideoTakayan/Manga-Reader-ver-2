@@ -82,7 +82,7 @@ class BrowseSettingsScreen : Screen {
         onTypeSelected: (Int) -> Unit
     ) {
         var showDialog by remember { mutableStateOf(false) }
-        val types = listOf("Trình cài đặt hệ thống", "Trình cài đặt nội bộ (Mihon Style)")
+        val types = listOf("Trình cài đặt hệ thống", "Trình cài đặt nội bộ (Tiêu chuẩn)")
         
         ListItem(
             headlineContent = { Text("Trình cài đặt phần mở rộng", color = Color.White) },

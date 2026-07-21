@@ -32,7 +32,7 @@ import com.example.manga_readerver2.ui.components.EmptyState
 import java.text.SimpleDateFormat
 import java.util.*
 
-// ── Dialog trạng thái ──────────────────────────────────────────
+// Cấu hình giao diện hộp thoại trạng thái (Status Dialog)───
 sealed interface HistoryDialog {
     data class DeleteItem(val mangaId: Long, val chapterId: Long) : HistoryDialog
     data object DeleteAll : HistoryDialog
@@ -53,7 +53,7 @@ class HistoryScreen : Screen {
         var isSearchActive by remember { mutableStateOf(false) }
         var dialog by remember { mutableStateOf<HistoryDialog?>(null) }
 
-        // ── Delete dialogs ───────────────────────────────────────
+        // Cấu hình giao diện xác thực hành động xóa (Delete Confirmation Dialogs)
         when (val d = dialog) {
             is HistoryDialog.DeleteItem -> {
                 HistoryDeleteDialog(
@@ -63,7 +63,7 @@ class HistoryScreen : Screen {
                         dialog = null
                     },
                     onDeleteAll = {
-                        screenModel.deleteHistoryItem(d.mangaId) // xóa toàn bộ truyện này
+                        screenModel.deleteHistoryItem(d.mangaId) // Kích hoạt luồng xóa toàn bộ lịch sử đọc của truyện hiện tại
                         dialog = null
                     }
                 )
@@ -185,7 +185,7 @@ class HistoryScreen : Screen {
                                         confirmValueChange = { value ->
                                             if (value == SwipeToDismissBoxValue.EndToStart) {
                                                 dialog = HistoryDialog.DeleteItem(item.mangaId, item.chapterId)
-                                                false // Không dismiss ngay, đợi user xác nhận
+                                                false // Vô hiệu hóa tính năng tự động đóng (Dismiss) nhằm yêu cầu người dùng xác thực rõ ràng
                                             } else false
                                         }
                                     )
@@ -247,7 +247,7 @@ private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 }
 
-// ── Dialog xác nhận xóa 1 truyện ───────────────────────────────
+// Component: Hộp thoại xác thực xóa bản ghi lịch sử truyện đơn
 @Composable
 fun HistoryDeleteDialog(
     onDismiss: () -> Unit,
@@ -288,7 +288,7 @@ fun HistoryDeleteDialog(
     )
 }
 
-// ── Dialog xác nhận xóa tất cả ─────────────────────────────────
+// Component: Hộp thoại xác thực xóa toàn bộ lịch sử (Clear All)
 @Composable
 fun HistoryDeleteAllDialog(
     onDismiss: () -> Unit,
@@ -309,7 +309,7 @@ fun HistoryDeleteAllDialog(
     )
 }
 
-// ── HistoryCard ─────────────────────────────────────────────────
+// Component: Thẻ thông tin lịch sử đọc (HistoryCard)─
 @Composable
 fun HistoryCard(
     item: History,
@@ -339,7 +339,7 @@ fun HistoryCard(
             modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── Cover ────────────────────────────────────────
+            // Thành phần: Hiển thị ảnh bìa (Cover Image)─
             Box(
                 modifier = Modifier
                     .size(50.dp, 70.dp)
@@ -366,7 +366,7 @@ fun HistoryCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // ── Text info ────────────────────────────────────
+            // Thành phần: Trích xuất siêu dữ liệu dạng văn bản (Text Information)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     item.mangaTitle,
@@ -392,7 +392,7 @@ fun HistoryCard(
                 )
             }
 
-            // ── Nút Yêu thích (chỉ hiện nếu chưa trong thư viện) ──
+            // Thành phần: Nút điều hướng thêm vào thư viện (Ẩn nếu đã tồn tại trong thư viện)
             if (!isFavorite) {
                 IconButton(onClick = onFavoriteClick) {
                     Icon(
@@ -404,7 +404,7 @@ fun HistoryCard(
                 }
             }
 
-            // ── Nút Xóa ──────────────────────────────────────
+            // Thành phần: Nút kích hoạt lệnh xóa bản ghi
             IconButton(onClick = onDeleteClick) {
                 Icon(
                     Icons.Default.Delete,

@@ -9,7 +9,7 @@ class UserAgentInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         
-        // Chỉ thêm User-Agent nếu yêu cầu chưa có sẵn Header này
+        // Tích hợp chuỗi User-Agent mặc định vào luồng yêu cầu mạng (Request) trong trường hợp tham số này chưa được khai báo
         if (originalRequest.header("User-Agent") != null) {
             return chain.proceed(originalRequest)
         }

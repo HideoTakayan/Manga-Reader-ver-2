@@ -29,7 +29,7 @@ internal class ExtensionInstallReceiver(private val listener: Listener) : Broadc
             context,
             this,
             filter,
-            ContextCompat.RECEIVER_EXPORTED // Mihon uses RECEIVER_NOT_EXPORTED but we need to receive from system
+            ContextCompat.RECEIVER_EXPORTED // Yêu cầu cấp quyền Exported để tiếp nhận Broadcast từ hệ điều hành
         )
     }
 

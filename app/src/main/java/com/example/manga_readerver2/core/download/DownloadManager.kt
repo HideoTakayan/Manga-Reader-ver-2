@@ -41,7 +41,7 @@ class DownloadManager(
 
     fun downloadChapters(manga: Manga, chapters: List<Chapter>, source: Source) {
         val isNovel = if (source is com.example.manga_readerver2.source_js.JsSource) source.isNovel else false
-        // Lọc các chapter đã có trong queue (Mihon pattern: tránh tải trùng)
+        // Loại bỏ các chương đã tồn tại trong hàng đợi để ngăn chặn tình trạng tải trùng lặp
         val existingIds = _queueState.value.map { it.chapter.id }.toSet()
         val newDownloads = chapters
             .filter { it.id !in existingIds }
@@ -52,13 +52,13 @@ class DownloadManager(
             }
         if (newDownloads.isEmpty()) return
         
-        // Cập nhật state (Thread-safe update)
+        // Cập nhật trạng thái một cách an toàn giữa các luồng (Thread-safe update)
         _queueState.update { it + newDownloads }
         
         // Lưu trữ vào Store
         scope.launch { downloadStore.saveQueue(_queueState.value) }
 
-        // Gọi Service bắt đầu quá trình tải ngầm
+        // Kích hoạt dịch vụ hệ thống (Service) để thực thi tiến trình tải ngầm
         DownloadService.start(context)
     }
 
@@ -74,7 +74,7 @@ class DownloadManager(
 
     fun startDownloads() {
         if (_queueState.value.isNotEmpty()) {
-            // Fix: copy sang list mới sau khi mutate để StateFlow emit được → UI update
+            // copy sang list mới sau khi mutate để StateFlow emit được → UI update
             var hasChanged = false
             _queueState.value.forEach {
                 if (it.status == Download.State.ERROR) {
@@ -83,7 +83,7 @@ class DownloadManager(
                 }
             }
             if (hasChanged) {
-                // Fix D4: Map tạo ra instance Download mới để đổi tham chiếu, giúp UI update state correctly
+                // Map tạo ra instance Download mới để đổi tham chiếu, giúp UI update state correctly
                 // Không cần copy() vì UI sẽ tự động update thông qua statusFlow
             }
             DownloadService.start(context)

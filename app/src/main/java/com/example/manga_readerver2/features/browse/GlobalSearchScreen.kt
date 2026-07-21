@@ -141,7 +141,7 @@ class GlobalSearchScreen(val initialQuery: String = "") : Screen {
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         
-                        // LinearProgressIndicator tổng (giống Mihon)
+                        // Triển khai thanh tiến trình tuyến tính (LinearProgressIndicator) làm hiển thị tổng thể
                         if (state.isSearching || state.results.isNotEmpty()) {
                             val total = state.results.size
                             val done = state.results.values.count { it !is GlobalSearchResult.Loading }
@@ -166,7 +166,7 @@ class GlobalSearchScreen(val initialQuery: String = "") : Screen {
             ) {
                 var resultsList = state.results.toList()
                 
-                // Áp dụng bộ lọc
+                // Áp dụng thuật toán lọc nội dung (Filter)
                 resultsList = when (selectedFilter) {
                     GlobalSearchFilter.PINNED -> resultsList.filter { pinnedSources.contains(it.first.id.toString()) }
                     GlobalSearchFilter.HAS_RESULTS -> resultsList.filter { (_, result) -> 

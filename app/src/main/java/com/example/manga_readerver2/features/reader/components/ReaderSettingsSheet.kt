@@ -75,7 +75,7 @@ fun ReaderSettingsSheet(
             
             HorizontalDivider(color = GlassBorder)
 
-            // Brightness Control (VBook style)
+            // Thành phần điều khiển độ sáng màn hình (Brightness Control)
             val brightness by screenModel.brightness.collectAsState()
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -194,7 +194,7 @@ private fun TextDisplayTab(screenModel: ReaderScreenModel) {
 
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Precise Font Size Control (VBook style)
+        // Thành phần tinh chỉnh kích thước phông chữ (Precise Font Size Control)
         PreciseSettingItem(
             label = "Cỡ chữ",
             value = "${fontSize.toInt()}%",
@@ -204,7 +204,7 @@ private fun TextDisplayTab(screenModel: ReaderScreenModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Precise Line Spacing Control (VBook style)
+        // Thành phần tinh chỉnh khoảng cách dòng (Precise Line Spacing Control)
         PreciseSettingItem(
             label = "Dẫn dòng",
             value = "${(lineSpacing * 100).toInt()}%",
@@ -274,7 +274,7 @@ private fun ThemeCircle(label: String, color: Color, isSelected: Boolean, onClic
 private fun TtsSettingsTab(screenModel: ReaderScreenModel) {
     val speed by screenModel.ttsSpeed.collectAsState()
     val pitch by screenModel.ttsPitch.collectAsState()
-    // Local state cho preview slider khi kéo (không restart TTS mỗi frame)
+    // Trạng thái cục bộ (Local State) quản lý thanh trượt (Slider) nhằm tránh việc khởi động lại TTS (Restart TTS) trên mỗi khung hình
     var previewSpeed by remember(speed) { mutableStateOf(speed) }
     var previewPitch by remember(pitch) { mutableStateOf(pitch) }
     Column {
@@ -283,8 +283,8 @@ private fun TtsSettingsTab(screenModel: ReaderScreenModel) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
         Slider(
             value = previewSpeed,
-            onValueChange = { previewSpeed = it }, // Chỉ cập nhật UI, không restart TTS
-            onValueChangeFinished = { screenModel.updateTtsSpeed(previewSpeed) }, // Restart khi thả tay
+            onValueChange = { previewSpeed = it }, // Cập nhật giao diện đơn thuần, không can thiệp khởi động lại tiến trình TTS
+            onValueChangeFinished = { screenModel.updateTtsSpeed(previewSpeed) }, // Kích hoạt tiến trình khởi động lại khi hoàn tất thao tác kéo thả
             valueRange = 0.5f..2.0f,
             modifier = Modifier.padding(horizontal = 16.dp),
             colors = SliderDefaults.colors(thumbColor = PrimaryOrange, activeTrackColor = PrimaryOrange)
@@ -294,8 +294,8 @@ private fun TtsSettingsTab(screenModel: ReaderScreenModel) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
         Slider(
             value = previewPitch,
-            onValueChange = { previewPitch = it }, // Chỉ cập nhật UI
-            onValueChangeFinished = { screenModel.updateTtsPitch(previewPitch) }, // Restart khi thả tay
+            onValueChange = { previewPitch = it }, // Giới hạn thao tác cập nhật trên giao diện người dùng
+            onValueChangeFinished = { screenModel.updateTtsPitch(previewPitch) }, // Kích hoạt tiến trình khởi động lại khi hoàn tất thao tác kéo thả
             valueRange = 0.5f..2.0f,
             modifier = Modifier.padding(horizontal = 16.dp),
             colors = SliderDefaults.colors(thumbColor = PrimaryOrange, activeTrackColor = PrimaryOrange)
@@ -451,11 +451,11 @@ fun TapZonesTab(screenModel: ReaderScreenModel) {
         Text("Tùy chỉnh vùng chạm", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text("Nhấn vào từng ô để thay đổi chức năng. Áp dụng cho cả đọc ngang và cuộn dọc.", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 16.dp))
 
-        // 3x3 Grid
+        // Cấu trúc lưới 3x3 (Grid 3x3)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f) // Square
+                .aspectRatio(1f) // Định dạng tỷ lệ hình vuông (Square Ratio)
                 .padding(16.dp)
                 .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                 .border(1.dp, GlassBorder, RoundedCornerShape(12.dp))

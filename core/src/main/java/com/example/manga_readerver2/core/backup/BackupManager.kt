@@ -144,13 +144,20 @@ class BackupManager(
                         chapterNumber = bc.chapterNumber
                     )
                 }
+                // Khôi phục danh sách chương
+                // Quá trình khôi phục được bảo vệ bằng transaction cục bộ trong hàm insertChapters,
+                // qua đó giảm thiểu chi phí ghi cơ sở dữ liệu trên mỗi chương.
                 mangaRepository.insertChapters(chapters)
 
-                // Cập nhật trạng thái đã đọc nếu bản sao lưu có thông tin mới hơn
-                chapters.forEach { chapter ->
-                    if (chapter.read || chapter.lastPageRead > 0) {
-                        mangaRepository.updateChapterReadStatus(chapter)
-                    }
+                // Đồng bộ hàng loạt trạng thái đọc (read status) thay vì gửi nhiều lệnh update rời rạc.
+                // Lấy các chương đã được ghi vào DB, đối chiếu với backup để update
+                // trạng thái đọc. insertChapters dùng INSERT OR IGNORE nên chỉ update
+                // metadata mới (tên, số chương), không ghi đè read/lastPageRead.
+                // Ta cần update riêng những chương có trạng thái đọc.
+                val chaptersToUpdate = chapters.filter { it.read || it.lastPageRead > 0 || it.bookmark }
+                if (chaptersToUpdate.isNotEmpty()) {
+                    // Cập nhật dữ liệu thông qua batch operation để đảm bảo tính toàn vẹn (ACID) của SQLite
+                    mangaRepository.updateChapterReadStatuses(chaptersToUpdate)
                 }
 
                 // Restore Category Mappings

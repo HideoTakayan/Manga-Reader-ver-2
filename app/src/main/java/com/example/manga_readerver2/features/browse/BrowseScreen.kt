@@ -54,7 +54,7 @@ import eu.kanade.tachiyomi.source.CatalogueSource
 
 fun isJsExtension(ext: Extension): Boolean {
     return when (ext) {
-        // Dùng `is JsSource` thay vì so sánh simpleName để tránh lỗi khi pkgName không có prefix "js.extension."
+        // Ưu tiên sử dụng toán tử 'is JsSource' thay vì phân tích tên lớp (simpleName) nhằm ngăn ngừa ngoại lệ với các gói không mang tiền tố chuẩn
         is Extension.Installed -> ext.sources.any { it is JsSource } || ext.pkgName.startsWith("js.extension.")
         is Extension.Available -> ext.pkgName.startsWith("js.extension.") || ext.apkName.endsWith(".zip", ignoreCase = true)
         is Extension.Untrusted -> ext.pkgName.startsWith("js.extension.")
@@ -85,7 +85,7 @@ class BrowseScreen : Screen {
         var isSearching by remember { mutableStateOf(false) }
         var searchQuery by remember { mutableStateOf("") }
 
-        // Bộ lọc nội dung: 0 - Tất cả, 1 - Manga (APK), 2 - Truyện chữ (JS)
+        // Cấu trúc bộ lọc nội dung: 0 (Tất cả), 1 (Truyện tranh APK), 2 (Tiểu thuyết JS)
         var contentTypeFilter by remember { mutableIntStateOf(0) }
         
         val folderPickerLauncher = rememberLauncherForActivityResult(
@@ -813,7 +813,7 @@ fun ExtensionsTab(
                         fontSize = 12.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    // Nút Trust All
+                    // Nút xác thực hàng loạt (Trust All)
                     TextButton(
                         onClick = { filteredUntrusted.forEach { onTrust(it) } },
                         colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFF9800))

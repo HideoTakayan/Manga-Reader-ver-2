@@ -63,6 +63,8 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
         val screenModel = rememberScreenModel { MangaDetailScreenModel() }
         val mangaState by screenModel.manga.collectAsState()
         val chapters by screenModel.chapters.collectAsState()
+        // FAB dùng danh sách đầy đủ (không filter) để không bị ẩn khi bật filter
+        val allChapters by screenModel.allChapters.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
         val isLiked by screenModel.isLiked.collectAsState()
         val sortMode by screenModel.sortMode.collectAsState()
@@ -96,7 +98,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
         val isFabExpanded = remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
 
         Scaffold(
-            containerColor = BackgroundDark,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 MangaDetailTopBar(
                     title = if (isScrolled) manga?.title ?: "" else "",
@@ -147,8 +149,9 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                 }
             },
             floatingActionButton = {
-                if (manga != null && chapters.isNotEmpty() && !isSelectionMode) {
-                    val nextToRead = chapters.findLast { !it.read } ?: chapters.firstOrNull()
+                if (manga != null && allChapters.isNotEmpty() && !isSelectionMode) {
+                    // Sử dụng danh sách đầy đủ (không qua bộ lọc) để nút FAB không bị ẩn khi người dùng đang bật bộ lọc "Chưa đọc"
+                    val nextToRead = allChapters.findLast { !it.read } ?: allChapters.firstOrNull()
                     if (nextToRead != null) {
                         ExtendedFloatingActionButton(
                             onClick = { navigator.push(ReaderScreen(manga.id, nextToRead.id)) },
@@ -171,7 +174,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                         }
                     }
                     errorMessage != null && manga == null -> {
-                        // Hiện lỗi rõ ràng thay vì blank screen
+                        // Hiển thị thông báo lỗi trực quan thay vì để màn hình trống
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -227,7 +230,7 @@ data class MangaDetailScreen(val mangaId: Long) : Screen {
                                         // Đang liked → mở dialog để đổi category hoặc unfavorite
                                         showCategoryDialog = true
                                     } else {
-                                        // Chưa liked → toggle favorite rồi mở dialog chọn category (chuẩn Mihon)
+                                        // Nếu chưa thêm vào thư viện, tự động thêm và mở hộp thoại chọn danh mục
                                         screenModel.toggleLike()
                                         showCategoryDialog = true
                                     }
@@ -474,7 +477,7 @@ fun MangaDetailContent(
                             Brush.verticalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    BackgroundDark
+                                    MaterialTheme.colorScheme.background
                                 )
                             )
                         )
@@ -629,7 +632,7 @@ fun MangaDetailContent(
                                 .matchParentSize()
                                 .background(
                                     Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, BackgroundDark)
+                                        colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background)
                                     )
                                 )
                         )
@@ -679,7 +682,7 @@ fun MangaDetailContent(
                     fontSize = 17.sp
                 )
                 IconButton(onClick = onFilterClick) {
-                    Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White)
+                    Icon(Icons.Filled.Sort, null, tint = Color.White)
                 }
             }
             HorizontalDivider(
@@ -688,7 +691,7 @@ fun MangaDetailContent(
             )
         }
 
-        items(chapters) { chapter ->
+        items(chapters, key = { it.id }) { chapter ->
             val state = downloadStatus[chapter.id] ?: com.example.manga_readerver2.core.download.Download.State.NOT_DOWNLOADED
             val isSelected = selectedChapterIds.contains(chapter.id)
             ChapterItem(

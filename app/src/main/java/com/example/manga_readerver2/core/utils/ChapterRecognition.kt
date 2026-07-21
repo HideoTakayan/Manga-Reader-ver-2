@@ -6,7 +6,7 @@ object ChapterRecognition {
 
     private const val numberPattern = "([0-9]+)(\\.[0-9]+)?(\\.?[a-z]+)?"
     
-    // Bỏ qua các thông tin volume/season: Vol.1, v1, season 2...
+    // Loại trừ các tiền tố volume/season (ví dụ: Vol.1, v1, season 2) để tránh nhiễu
     private val unwanted = Regex("\\b(?:v|ver|vol|version|volume|season|s)[^a-z]?[0-9]+", RegexOption.IGNORE_CASE)
     
     // Tìm chuỗi như "ch. 123", "chương 123", "tập 123"
@@ -46,7 +46,7 @@ object ChapterRecognition {
                       cleanName.contains("omake") || 
                       cleanName.contains("special")
                       
-        // 3. Loại bỏ thông tin phần (Volume) để tránh nhận diện nhầm số (hiện trạng Vol.1 Ch.5 -> Ch.5)
+        // 3. Loại trừ siêu dữ liệu phân mảnh (Volume) nhằm ngăn ngừa tình trạng trích xuất sai chỉ số (ví dụ: ưu tiên Ch.5 thay vì Vol.1)
         val nameWithoutVolume = cleanName.replace(unwanted, "")
         
         // 4. Thử khớp cơ bản (có tiền tố) trên chuỗi đã lọc
@@ -61,7 +61,7 @@ object ChapterRecognition {
             return getChapterNumberFromMatch(match, isExtra)
         }
         
-        // 6. Trường hợp an toàn (Fail-safe): Thử lại trên chuỗi ban đầu
+        // 6. Cơ chế dự phòng (Fail-safe): Thực hiện đối chiếu trên chuỗi nguyên bản
         match = basic.find(cleanName)
         if (match != null) return getChapterNumberFromMatch(match, isExtra)
         
@@ -90,7 +90,7 @@ object ChapterRecognition {
             if (alpha.contains("omake")) return 0.98f
             if (alpha.contains("special")) return 0.97f
             
-            // Kí tự chữ a -> .1
+            // Ánh xạ ký tự chữ cái thành hệ số thập phân (ví dụ: a -> .1)
             val trimmed = alpha.replace(".", "")
             if (trimmed.length == 1) {
                 return parseAlphaPostFix(trimmed[0])

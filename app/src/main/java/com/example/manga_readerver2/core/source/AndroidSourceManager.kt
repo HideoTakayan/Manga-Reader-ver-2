@@ -34,8 +34,8 @@ class AndroidSourceManager(
 
     init {
         scope.launch {
-            // Reactive: tự cập nhật khi installedExtensionsFlow thay đổi
-            // (xảy ra khi trust extension, cài mới, hoặc refreshInstalledExtensions)
+            // Kiến trúc phản ứng (Reactive): Tự động đồng bộ nguồn dữ liệu mỗi khi installedExtensionsFlow phát ra sự kiện mới
+            // Các luồng sự kiện bao gồm: xác thực mở rộng (trust extension), cài đặt mới (install) hoặc làm mới danh sách (refresh)
             extensionManager.installedExtensionsFlow.collectLatest { extensions ->
                 val mutableMap = mutableMapOf<Long, Source>()
                 mutableMap[localSource.id] = localSource

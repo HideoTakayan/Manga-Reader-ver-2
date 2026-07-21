@@ -118,7 +118,7 @@ object EpubReader {
      */
     fun getChapterText(file: File, hrefWithAnchor: String): String {
         return try {
-            // Fix BUG-EPUB: Decode URL (e.g. %20 -> " ") vì ZipFile.getEntry cần raw string
+            // Giải mã URL (ví dụ: chuyển đổi '%20' thành khoảng trắng) để đảm bảo định dạng raw string tương thích với phương thức ZipFile.getEntry()
             val decodedHref = try {
                 java.net.URLDecoder.decode(hrefWithAnchor, "UTF-8")
             } catch (e: Exception) {
@@ -130,7 +130,7 @@ object EpubReader {
                 // 1. Thử tìm entry trực tiếp (exact match)
                 var entry = zip.getEntry(path)
                 
-                // 2. Nếu không thấy, thử tìm theo suffix (xử lý relative path hoặc sai khác OEBPS/Text/...)
+                // 2. Nếu không tìm thấy tệp tin trực tiếp, tiến hành tìm kiếm theo hậu tố (suffix) để giải quyết các trường hợp sai lệch về đường dẫn tương đối (ví dụ: OEBPS/Text/...)
                 if (entry == null) {
                     entry = zip.entries().asSequence().find { 
                         it.name.endsWith(path, ignoreCase = true) || path.endsWith(it.name, ignoreCase = true)
@@ -249,7 +249,7 @@ object EpubReader {
         val doc = Jsoup.parse(html)
         doc.select("script, style, nav").remove()
 
-        // Thêm newline sau các block elements để tách đoạn
+        // Chèn ký tự xuống dòng sau các thẻ khối (block elements) để phân tách đoạn văn bản hợp lý
         doc.select("p, div, li, h1, h2, h3, h4, h5, h6, tr").forEach { el ->
             el.appendText("\n")
         }
@@ -271,7 +271,7 @@ object EpubReader {
      * baseDir phải kết thúc bằng "/" hoặc rỗng.
      */
     private fun resolveHref(baseDir: String, href: String): String {
-        // Bỏ qua anchor khi resolve path
+        // Loại bỏ phần neo (anchor) trong quá trình phân giải đường dẫn
         val path = href.substringBefore("#")
         val anchor = href.substringAfter("#", "")
 

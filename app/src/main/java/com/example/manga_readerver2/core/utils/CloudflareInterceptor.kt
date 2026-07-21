@@ -31,7 +31,7 @@ class CloudflareInterceptor(
         val originalRequest = chain.request()
         val response = chain.proceed(originalRequest)
 
-        // Check if response is Cloudflare challenge (503 or 403)
+        // Đánh giá mã trạng thái (503 hoặc 403) nhằm nhận diện cơ chế bảo vệ Cloudflare Challenge
         if (response.code !in listOf(403, 503)) {
             return response
         }
@@ -43,7 +43,7 @@ class CloudflareInterceptor(
 
         logcat { "Cloudflare challenge detected for ${originalRequest.url}. Starting WebView resolution..." }
         
-        // Cần đóng response cũ lại trước khi tạo cái mới
+        // Close the previous response to free up resources before starting the challenge
         response.close()
 
         val latch = CountDownLatch(1)
@@ -64,7 +64,7 @@ class CloudflareInterceptor(
                         handler.post { webView.destroy() }
                         latch.countDown()
                     } else {
-                        // Check again in 500ms
+                        // Cấu hình chu kỳ kiểm tra lặp lại với độ trễ 500ms
                         handler.postDelayed(this, 500)
                     }
                 }
@@ -89,9 +89,9 @@ class CloudflareInterceptor(
             }
 
             webView.loadUrl(originalRequest.url.toString())
-            handler.post(checkCookieRunnable) // Bắt đầu vòng lặp polling
+            handler.post(checkCookieRunnable) // Kích hoạt cơ chế truy vấn liên tục (Polling Loop)
 
-            // Hỗ trợ timeout 30 giây
+            // Thiết lập ngưỡng giới hạn thời gian (Timeout) tối đa 30 giây
             handler.postDelayed({
                 if (!resolved) {
                     logcat { "Cloudflare resolution timeout!" }
@@ -101,13 +101,13 @@ class CloudflareInterceptor(
             }, 30000)
         }
 
-        latch.await(35, TimeUnit.SECONDS) // Chờ tối đa 35 giây ở thread mạng
+        latch.await(35, TimeUnit.SECONDS) // Tạm ngưng luồng mạng (Network Thread) với ngưỡng tối đa 35 giây
 
         if (!resolved) {
             throw IOException("Không thể vượt qua Cloudflare Challenge. Hãy thử mở web bằng trình duyệt.")
         }
 
-        // Tạo request mới với cookie đã lấy được
+        // Khởi tạo yêu cầu mạng (Request) mới tích hợp chuỗi định danh (Cookie) vừa thu thập
         val cookies = CookieManager.getInstance().getCookie(originalRequest.url.toString())
         val newRequest = originalRequest.newBuilder()
             .header("User-Agent", newUserAgent)

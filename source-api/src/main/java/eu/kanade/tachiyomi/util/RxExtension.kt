@@ -8,8 +8,8 @@ import rx.Subscription
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-// awaitSingle() đã được định nghĩa trong RxCoroutineBridge.kt
-// File này chỉ giữ lại awaitOne để tương thích backward
+// awaitSingle() đã được định nghĩa sẵn trong lớp RxCoroutineBridge.kt
+// Module này hiện chỉ duy trì hàm awaitOne nhằm đảm bảo tính tương thích ngược (Backward Compatibility)
 
 internal suspend fun <T> Observable<T>.awaitOneInternal(): T = suspendCancellableCoroutine { cont ->
     cont.unsubscribeOnCancellation(

@@ -39,6 +39,7 @@ class DownloadService : Service() {
     private val downloadCache: com.example.manga_readerver2.core.download.DownloadCache = Injekt.get()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var downloadJob: Job? = null
+    private var activeDownloadId: Long? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val mutex = kotlinx.coroutines.sync.Mutex()
 
@@ -54,6 +55,12 @@ class DownloadService : Service() {
             if (queue.isEmpty()) {
                 releaseWakeLock()
                 stopSelf()
+            } else {
+                // Hủy tác vụ tải nếu chapterId đang tải không còn tồn tại trong queue (do người dùng bấm Hủy)
+                val activeId = activeDownloadId
+                if (activeId != null && queue.none { it.chapter.id == activeId }) {
+                    downloadJob?.cancel()
+                }
             }
         }.launchIn(scope)
 
@@ -109,6 +116,7 @@ class DownloadService : Service() {
                 if (downloadJob?.isActive == true) return@withLock
 
                 downloadJob = scope.launch {
+                    activeDownloadId = currentDownload.chapter.id
                     downloadManager.updateDownloadState(currentDownload, Download.State.DOWNLOADING)
                     updateNotification("Đang tải: ${currentDownload.manga.title} - ${currentDownload.chapter.name}")
 
@@ -116,10 +124,14 @@ class DownloadService : Service() {
                         downloadChapter(currentDownload)
                         downloadManager.updateDownloadState(currentDownload, Download.State.DOWNLOADED)
                         downloadManager.removeFromQueue(currentDownload)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        // Bị hủy ngầm, ném tiếp ra ngoài, processQueue không cần đổi State thành ERROR
+                        throw e
                     } catch (e: Exception) {
                         e.printStackTrace()
                         downloadManager.updateDownloadState(currentDownload, Download.State.ERROR)
                     } finally {
+                        activeDownloadId = null
                         downloadJob = null
                         val nextQueue = downloadManager.queueState.value
                         if (nextQueue.any { it.status == Download.State.QUEUE }) {
@@ -209,7 +221,7 @@ class DownloadService : Service() {
                 throw Exception("Lỗi lưu truyện chữ EPUB")
             }
         } else {
-            // Tải TRUYỆN TRANH (Manga) - PHIÊN BẢN 2.0 (Song song)
+            // Tiến hành tải xuống dữ liệu hình ảnh (Manga) theo cơ chế tải song song để tối ưu tốc độ
             val httpSource = source as? HttpSource
             val jsSource = source as? JsSource
             
@@ -223,7 +235,7 @@ class DownloadService : Service() {
                 throw Exception("Bộ nhớ thiết bị không đủ (Cần tối thiểu 100MB)")
             }
 
-            // 2. Tạo thư mục tạm (Chuẩn Mihon: Tải vào _tmp trước khi nén)
+            // 2. Thiết lập thư mục lưu trữ tạm thời (_tmp) trong quá trình tải xuống trước khi thực hiện nén
             val tmpDir = fileManager.getChapterPath(download.source.name, download.manga.title, download.manga.id.toString(), download.chapter.name + "_tmp")
             if (!tmpDir.exists()) tmpDir.mkdirs()
             
@@ -248,7 +260,7 @@ class DownloadService : Service() {
                                 val imageUrl = page.imageUrl ?: httpSource?.getImageUrl(page) ?: ""
                                 if (imageUrl.isEmpty()) throw Exception("Không thể lấy URL ảnh cho trang ${index + 1}")
 
-                                // Fix D2: JsSource không có headers, dùng header default hợp lý hoặc header từ httpSource
+                                // Cung cấp Header mặc định hoặc kế thừa từ httpSource trong trường hợp JsSource không hỗ trợ Header
                                 val requestHeaders = httpSource?.headers ?: okhttp3.Headers.Builder()
                                     .add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                                     .build()
@@ -296,7 +308,7 @@ class DownloadService : Service() {
                 // 4. Sinh Metadata ComicInfo.xml
                 ComicInfo.createComicInfoFile(tmpDir, download.manga, download.chapter, download.source.name)
                 
-                // 5. Kiểm tra và nén thành CBZ (Mihon Style: Dùng file .tmp khi đang nén)
+                // 5. Kiểm tra tính toàn vẹn của dữ liệu ảnh và tiến hành nén thành định dạng CBZ (Sử dụng đuôi .tmp trong quá trình nén)
                 val cbzFile = fileManager.getChapterCbzPath(download.source.name, download.manga.title, download.manga.id.toString(), download.chapter.name)
                 val tmpCbzFile = File(cbzFile.parent, cbzFile.name + ".tmp")
                 
@@ -327,8 +339,12 @@ class DownloadService : Service() {
                 
                 // Tải xong hoàn toàn
                 updateNotification("Đã tải xong: ${download.chapter.name}", progress = 100)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Xóa tmpDir ngay lập tức nếu bị hủy
+                if (tmpDir.exists()) tmpDir.deleteRecursively()
+                throw e
             } catch (e: Exception) {
-                // Fix D3: Xóa tmpDir nếu có lỗi tải
+                // Xóa tmpDir nếu có lỗi tải
                 if (tmpDir.exists()) tmpDir.deleteRecursively()
                 throw e
             }

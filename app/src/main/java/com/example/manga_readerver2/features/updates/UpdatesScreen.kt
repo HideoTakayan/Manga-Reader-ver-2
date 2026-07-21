@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -53,16 +54,19 @@ class UpdatesScreen : Screen {
 
         var isRefreshing by remember { mutableStateOf(false) }
 
-        // Bấm Back khi đang ở chế độ chọn nhiều → thoát mode
+        // Cấu hình sự kiện nút Back: Ngắt chế độ đa lựa chọn (Selection Mode) khi đang kích hoạt
         BackHandler(enabled = isSelectionMode) {
             screenModel.clearSelection()
         }
 
+        val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
+
         Scaffold(
-            containerColor = BackgroundDark,
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 if (isSelectionMode) {
-                    // ── AppBar Selection Mode ──────────────────
+                    // Component: Thanh công cụ điều hướng đa lựa chọn (Selection AppBar)
                     TopAppBar(
                         title = { Text("${selectedIds.size} đã chọn", color = Color.White) },
                         navigationIcon = {
@@ -75,10 +79,10 @@ class UpdatesScreen : Screen {
                                 Icon(Icons.Default.SelectAll, contentDescription = "Chọn tất cả", tint = Color.White)
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1A1A1A))
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     )
                 } else {
-                    // ── AppBar thường ──────────────────────────
+                    // Component: Thanh công cụ điều hướng tiêu chuẩn (Standard AppBar)
                     TopAppBar(
                         title = { Text("Cập nhật", color = Color.White, fontWeight = FontWeight.ExtraBold) },
                         actions = {
@@ -95,12 +99,13 @@ class UpdatesScreen : Screen {
                                 Icon(Icons.Default.Refresh, contentDescription = "Làm mới", tint = Color.White)
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                        scrollBehavior = scrollBehavior
                     )
                 }
             },
             bottomBar = {
-                // ── Bottom Action Bar (khi đang chọn nhiều) ──
+                // Component: Thanh công cụ thao tác nhanh (Bottom Action Bar)
                 if (isSelectionMode && selectedIds.isNotEmpty()) {
                     UpdatesBottomActionBar(
                         selectedIds = selectedIds,
@@ -149,7 +154,7 @@ class UpdatesScreen : Screen {
                         contentPadding = PaddingValues(bottom = if (isSelectionMode) 80.dp else 16.dp),
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        // Dòng "Cập nhật lần cuối"
+                        // Thành phần: Chuỗi văn bản hiển thị thời điểm đồng bộ gần nhất
                         if (lastUpdated > 0L) {
                             item(key = "last-updated") {
                                 Text(
@@ -167,7 +172,7 @@ class UpdatesScreen : Screen {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(BackgroundDark)
+                                        .background(MaterialTheme.colorScheme.background)
                                         .padding(horizontal = 16.dp, vertical = 6.dp)
                                 ) {
                                     Text(
@@ -230,7 +235,7 @@ private fun relativeTime(timestamp: Long): String {
     }
 }
 
-// ── UpdateCard ──────────────────────────────────────────────────
+// Component: Thẻ thông tin phiên bản cập nhật (UpdateCard)─
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun UpdateCard(
@@ -253,7 +258,7 @@ fun UpdateCard(
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Checkbox hoặc cover
+        // Thành phần: Trạng thái lựa chọn (Checkbox) hoặc Ảnh bìa (Cover)
         Box(modifier = Modifier.size(44.dp, 60.dp)) {
             AsyncImage(
                 model = com.example.manga_readerver2.domain.model.Manga(
@@ -293,7 +298,7 @@ fun UpdateCard(
                 overflow = TextOverflow.Ellipsis
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Chấm tròn xanh = chưa đọc
+                // Nhãn chỉ báo (Badge): Trạng thái chưa đọc (Unread Status)
                 if (!update.read) {
                     Box(
                         modifier = Modifier
@@ -321,7 +326,7 @@ fun UpdateCard(
             }
         }
 
-        // Nút tải xuống
+        // Thành phần: Trình điều khiển tải xuống (Download Button)
         if (!isSelectionMode) {
             IconButton(
                 onClick = onDownloadClick,
@@ -351,7 +356,7 @@ fun UpdateCard(
     }
 }
 
-// ── Bottom Action Bar ───────────────────────────────────────────
+// Component: Thanh tác vụ thao tác hàng loạt (Batch Action Bar)─
 @Composable
 fun UpdatesBottomActionBar(
     selectedIds: Set<Long>,

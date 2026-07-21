@@ -56,7 +56,7 @@ class ExtensionManager(
     private val untrustedExtensionMapFlow = MutableStateFlow(emptyMap<String, Extension.Untrusted>())
     val untrustedExtensionsFlow = untrustedExtensionMapFlow.mapExtensions(scope)
 
-    // Thư mục chứa JS extensions (tương thích với JsLoader)
+    // Khởi tạo thư mục gốc lưu trữ phần mở rộng JS (JS Extensions) tương thích hệ thống JsLoader
     val jsExtensionsBaseDir: File get() = File(context.filesDir, "js_extensions")
 
     init {
@@ -101,11 +101,11 @@ class ExtensionManager(
     private suspend fun initExtensions() {
         logcat(LogPriority.INFO) { "[ExtensionManager] Bắt đầu scan extensions..." }
 
-        // Lấy danh sách signature fingerprint từ các repo đã thêm
+        // Khai thác danh sách chữ ký số (Signature Fingerprint) từ các kho lưu trữ (Repo) đã cấu hình
         val repoRepository: com.example.manga_readerver2.domain.repository.ExtensionRepoRepository = Injekt.get()
         val repoSignatures = repoRepository.getAll().map { it.signingKeyFingerprint }.filter { it.isNotBlank() }.toSet()
 
-        // --- APK extensions ---
+        // Xử lý nạp phần mở rộng định dạng APK
         val apkResults = ExtensionLoader.loadExtensions(context, repoSignatures)
         logcat(LogPriority.INFO) { "[ExtensionManager] APK scan: ${apkResults.size} kết quả (Auto-trust ${repoSignatures.size} repo keys)" }
 
@@ -129,12 +129,12 @@ class ExtensionManager(
                     }
                 }
                 is LoadResult.Error -> {
-                    // Đã log chi tiết trong ExtensionLoader
+                    // Bỏ qua ngoại lệ; thông tin chi tiết đã được ghi nhận trong ExtensionLoader
                 }
             }
         }
 
-        // --- JS extensions ---
+        // Xử lý nạp phần mở rộng định dạng JS
         val jsExtensions = loadJsExtensions()
         logcat(LogPriority.INFO) { "[ExtensionManager] JS scan: ${jsExtensions.size} extension(s)" }
         for (jsExt in jsExtensions) {
@@ -149,7 +149,7 @@ class ExtensionManager(
         installedExtensionMapFlow.value = trusted
         untrustedExtensionMapFlow.value = untrusted
 
-        // Giải phóng QuickJS instance của các JS Source cũ để chống memory leak native
+        // Thu hồi tài nguyên QuickJS instance từ các nguồn JS cũ nhằm ngăn chặn tình trạng rò rỉ bộ nhớ (Memory Leak) ở tầng Native
         for (ext in oldExtensions) {
             for (source in ext.sources) {
                 if (source is JsSource) {
@@ -195,7 +195,7 @@ class ExtensionManager(
                 continue
             }
 
-            // Sử dụng trực tiếp tên thư mục làm pkgName để khớp với danh sách trên Repo
+            // Ánh xạ tên thư mục thành định danh gói (pkgName) để đồng bộ hóa với hệ thống quản lý Repo
             val pkgName = dir.name
 
             val installed = Extension.Installed(
@@ -203,7 +203,7 @@ class ExtensionManager(
                 pkgName = pkgName,
                 versionName = info.versionName,
                 versionCode = info.versionCode,
-                libVersion = 1.5, // JS extensions dùng version ổn định
+                libVersion = 1.5, // Phiên bản thư viện tham chiếu ổn định dành cho định dạng JS
                 lang = (info.source as? JsSource)?.lang ?: "all",
                 isNsfw = info.isNsfw,
                 author = info.author,
@@ -283,7 +283,7 @@ class ExtensionManager(
     }
 
     fun cancelInstallUpdateExtension(extension: Extension) {
-        // Not implemented in my simple installer yet, but following Mihon's signature
+        // Phương thức chưa được triển khai đầy đủ trên trình cài đặt hiện tại, tuy nhiên vẫn bảo đảm tuân thủ chữ ký chuẩn
     }
 
     fun uninstallExtension(pkgName: String) {
@@ -312,7 +312,7 @@ class ExtensionManager(
     suspend fun trust(extension: Extension.Untrusted) {
         trustExtension.trust(extension.pkgName, extension.versionCode, extension.signatureHash)
         untrustedExtensionMapFlow.value -= extension.pkgName
-        // Reload extension từ APK sau khi trust để nó vào installedExtensionMapFlow
+        // Khởi động lại (Reload) gói mở rộng từ tệp APK sau quá trình xác thực (Trust) nhằm đồng bộ trạng thái vào installedExtensionMapFlow
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 ExtensionLoader.loadExtensionFromPkgName(context, extension.pkgName)

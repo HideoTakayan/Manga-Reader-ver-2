@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -65,7 +66,7 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
             screenModel.initSource(sourceId)
         }
 
-        // Tạo luồng dữ liệu mới mỗi khi state thay đổi
+        // Khởi tạo luồng dữ liệu (Data Flow) mới mỗi khi trạng thái (State) thay đổi
         val listing by screenModel.listing.collectAsState()
         val query by screenModel.searchQuery.collectAsState()
         val filters by screenModel.filters.collectAsState()
@@ -131,7 +132,7 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
             }
         ) { paddingValues ->
             Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                // Thanh Chips: Phổ biến / Mới nhất
+                // Giao diện thanh bộ lọc (Chips): Phổ biến / Mới cập nhật
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = listing == CatalogueScreenModel.Listing.Popular,
@@ -145,7 +146,7 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                     )
                 }
 
-                // Grid Manga Paging
+                // Thành phần danh sách (Grid) hỗ trợ phân trang (Paging)
                 @OptIn(ExperimentalMaterial3Api::class)
                 androidx.compose.material3.pulltorefresh.PullToRefreshBox(
                     isRefreshing = pagingData.loadState.refresh is LoadState.Loading,
@@ -164,7 +165,10 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(pagingData.itemCount) { index ->
+                            items(
+                                count = pagingData.itemCount,
+                                key = pagingData.itemKey { it.id }
+                            ) { index ->
                                 val manga = pagingData[index]
                                 if (manga != null) {
                                     Column(modifier = Modifier.clickable { navigator.push(MangaDetailScreen(manga.id)) }) {
@@ -193,7 +197,7 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                                 }
                             }
                             
-                            // Append loading
+                            // Hiển thị trạng thái đang tải (Loading) ở cuối danh sách
                             if (pagingData.loadState.append is LoadState.Loading) {
                                 item {
                                     Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
@@ -250,10 +254,10 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                 }
             }
             
-            Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Gray.copy(alpha = 0.3f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Gray.copy(alpha = 0.3f))
             
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(filters) { filter ->
+                items(filters, key = { it.name }) { filter ->
                     FilterItem(filter)
                 }
             }
@@ -272,7 +276,7 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                 )
             }
             is Filter.Separator -> {
-                Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Gray.copy(alpha = 0.2f))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.Gray.copy(alpha = 0.2f))
             }
             is Filter.CheckBox -> {
                 var state by remember { mutableStateOf(filter.state) }
@@ -328,8 +332,8 @@ class CatalogueScreen(val sourceId: Long, val sourceName: String, val latest: Bo
                 var state by remember { mutableStateOf(filter.state) }
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(filter.name, color = Color.Gray, fontSize = 12.sp)
-                    // Ở đây có thể dùng ExposedDropdownMenu hoặc đơn giản là một Row cuộn ngang
-                    // Để đơn giản tôi sẽ dùng một Row các FilterChips
+                    // Cung cấp giao diện trình đơn (DropdownMenu) hoặc thanh cuộn ngang (Row) để lựa chọn bộ lọc
+                    // Triển khai cấu trúc Row kết hợp FilterChips để tối ưu hóa tính đơn giản và trực quan
                     Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         filter.values.forEachIndexed { index, value ->
                             FilterChip(

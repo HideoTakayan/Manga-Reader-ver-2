@@ -125,6 +125,6 @@ class LibraryUpdateWorker(
     companion object {
         const val TAG = "LibraryUpdateWorker"
         private const val CHANNEL_ID = "library_updates_channel"
-        private const val NOTIFICATION_ID = 1002  // Khác với DownloadService (1001) để tránh ghi đè thông báo
+        private const val NOTIFICATION_ID = 1002  // Đảm bảo định danh duy nhất (khác với DownloadService) để ngăn chặn tình trạng xung đột thông báo (Notification override)
     }
 }

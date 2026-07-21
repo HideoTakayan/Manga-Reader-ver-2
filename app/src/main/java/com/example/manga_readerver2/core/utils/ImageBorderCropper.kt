@@ -8,13 +8,13 @@ import kotlinx.coroutines.withContext
 
 /**
  * Tự động phát hiện và cắt viền trắng/sáng từ ảnh manga scan.
- * Dùng cùng thuật toán Mihon: scan từ 4 cạnh vào trong tìm pixel không trắng.
+ * scan từ 4 cạnh vào trong tìm pixel không trắng.
  */
 object ImageBorderCropper {
 
     /**
      * Ngưỡng độ sáng để coi là "viền trắng" (0-255).
-     * Giá trị cao hơn = cắt nhiều hơn (hành xử như Mihon: ~240).
+     * Giá trị cao hơn = cắt nhiều hơn (hành xử tiêu chuẩn: ~240).
      */
     private const val WHITE_THRESHOLD = 240
     private const val BLACK_THRESHOLD = 15
@@ -29,14 +29,14 @@ object ImageBorderCropper {
         val h = bitmap.height
         if (w == 0 || h == 0) return null
 
-        // Tối ưu hóa: copy toàn bộ pixel vào ByteBuffer
+        // Sử dụng ByteBuffer để copy pixel nhanh hơn
         val buffer = java.nio.ByteBuffer.allocateDirect(bitmap.byteCount)
         bitmap.copyPixelsToBuffer(buffer)
         buffer.rewind()
 
         val bytesPerPixel = bitmap.byteCount / (w * h)
         // Chỉ hỗ trợ ARGB_8888 (4 bytes) hoặc RGB_565 (2 bytes) cho đơn giản
-        // Nếu khác, fallback về getPixels
+        // Sử dụng cơ chế dự phòng getPixels nếu không thỏa mãn điều kiện
         val pixels = IntArray(w * h)
         if (bytesPerPixel == 4) {
             buffer.order(java.nio.ByteOrder.nativeOrder())
@@ -66,7 +66,7 @@ object ImageBorderCropper {
                 val b = pixel and 0xFF
                 // Hoặc format ABGR tuỳ máy, nhưng pixel trắng thì các kênh R,G,B đều phải cao (> ngưỡng)
                 // Byte thứ 4 (Alpha) bỏ qua. Do đó cách dễ nhất:
-                // Vì màu trắng thì R, G, B đều lớn. Nên check 3 byte thấp hoặc 3 byte bất kỳ trong 4 byte.
+                // Đối với dải màu trắng, giá trị R, G, B đều ở mức cao. Kiểm tra giới hạn của 3 byte thấp hoặc 3 byte bất kỳ trong chuỗi 4 byte.
             }
             return isBorderPixel(pixel)
         }

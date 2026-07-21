@@ -30,6 +30,7 @@ interface MangaRepository {
 
     suspend fun updateChapter(chapter: Chapter)
     suspend fun updateChapterReadStatus(chapter: Chapter)
+    suspend fun updateChapterReadStatuses(chapters: List<Chapter>)
 
     // Categories
     fun getCategories(): Flow<List<com.example.manga_readerver2.domain.model.Category>>
@@ -54,4 +55,7 @@ interface MangaRepository {
 
     // Updates
     fun getUpdates(): Flow<List<com.example.manga_readerver2.domain.model.Update>>
+
+    // Tối ưu hoá truy vấn cơ sở dữ liệu: Lấy số liệu thống kê (hasStarted, hasBookmark) của toàn bộ thư viện thông qua một câu lệnh duy nhất
+    suspend fun getLibraryStats(): Map<Long, Pair<Boolean, Boolean>>
 }

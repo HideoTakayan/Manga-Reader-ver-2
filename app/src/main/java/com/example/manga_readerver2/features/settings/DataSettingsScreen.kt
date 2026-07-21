@@ -50,7 +50,7 @@ class DataSettingsScreen : Screen {
         val autoClear by generalPreferences.autoClearCache.asFlow().collectAsState(initial = generalPreferences.autoClearCache.get())
         val maxSize by generalPreferences.maxCacheSize.asFlow().collectAsState(initial = generalPreferences.maxCacheSize.get())
 
-        // Hiển thị dialog preview trước khi restore
+        // Kích hoạt giao diện hộp thoại xem trước (Preview Dialog) trước quá trình phục hồi dữ liệu (Restore)
         backupPreview?.let { preview ->
             AlertDialog(
                 onDismissRequest = { screenModel.dismissBackupPreview() },

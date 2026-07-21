@@ -43,7 +43,7 @@ class StatisticsScreen : Screen {
         val stats by screenModel.state.collectAsState()
 
         Scaffold(
-            containerColor = BackgroundDark,
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
                     title = { Text("Thống kê", color = Color.White) },
@@ -52,7 +52,7 @@ class StatisticsScreen : Screen {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                 )
             }
         ) { padding ->

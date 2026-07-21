@@ -85,15 +85,19 @@ class LibraryScreenModel(
         }
         
         baseFlow.map { list ->
+            // Tối ưu hoá truy vấn cơ sở dữ liệu: Trích xuất thống kê toàn bộ thư viện bằng một truy vấn duy nhất
+            // để thay thế cho việc gọi truy vấn riêng lẻ trên từng bộ truyện (giảm độ phức tạp từ O(n) xuống O(1))
+            val statsMap = mangaRepository.getLibraryStats()
+
             list.map { item ->
                 val manga = item.manga
                 val sourceName = sourceManager.get(manga.source)?.name ?: "Local"
                 val mangaDir = fileManager.getMangaPath(sourceName, manga.title, manga.id.toString())
                 val hasDownloads = mangaDir.exists() && mangaDir.listFiles()?.any { it.extension == "cbz" || it.extension == "epub" } == true
 
-                val chapters = mangaRepository.getChaptersByMangaId(manga.id)
-                val hasStarted = chapters.any { it.read || it.lastPageRead > 0 }
-                val hasBookmark = chapters.any { it.bookmark }
+                val stats = statsMap[manga.id]
+                val hasStarted = stats?.first ?: false
+                val hasBookmark = stats?.second ?: false
 
                 LibraryItem(
                     manga = manga,
@@ -132,7 +136,7 @@ class LibraryScreenModel(
             }.let { filteredList ->
                 if (query.isEmpty()) filteredList else filteredList.filter { it.manga.title.contains(query, ignoreCase = true) }
             }
-        }.flowOn(Dispatchers.IO)  // Fix: dùng flowOn thay vì withContext bên trong map
+        }.flowOn(Dispatchers.IO)  // Thay đổi ngữ cảnh thực thi (Context) của Flow sang luồng IO để đảm bảo mượt mà
     }.flatMapLatest { it }
     .combine(sortMode) { list, sort ->
         when (sort) {
@@ -532,12 +536,12 @@ class LibraryScreenModel(
                     }
 
                     if (archiveFiles.isNotEmpty()) {
-                        // Fix BUG-08: Gom nhóm các file archive trong cùng một thư mục vào một bộ truyện duy nhất
+                        // Gom nhóm các file archive trong cùng một thư mục vào một bộ truyện duy nhất
                         val displayTitle = folderName
                         val displayAuthor = "Local"
                         val displayDesc = "Imported from folder: $folderName"
                         
-                        // Fix BUG-18: Kiểm tra xem manga đã tồn tại chưa bằng URL (local/folderName)
+                        // Kiểm tra xem manga đã tồn tại chưa bằng URL (local/folderName)
                         val existingManga = mangaRepository.getMangaByUrlAndSource("local/$folderName", 0L)
                         val mangaId = if (existingManga != null) {
                             existingManga.id

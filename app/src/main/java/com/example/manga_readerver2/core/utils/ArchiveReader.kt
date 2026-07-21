@@ -5,7 +5,7 @@ import java.io.InputStream
 import java.util.zip.ZipFile
 
 /**
- * Lớp hỗ trợ đọc các file lưu trữ (CBZ, ZIP) theo phong cách Mihon.
+ * Lớp hỗ trợ đọc các file lưu trữ (CBZ, ZIP) theo tiêu chuẩn.
  * Không giải nén toàn bộ, chỉ mở luồng dữ liệu (Stream) khi cần thiết.
  */
 object ArchiveReader {

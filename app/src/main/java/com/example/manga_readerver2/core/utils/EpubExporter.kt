@@ -17,7 +17,7 @@ object EpubExporter {
             destFile.parentFile?.mkdirs()
             FileOutputStream(destFile).use { fos ->
                 ZipOutputStream(fos).use { zos ->
-                    // 1. mimetype (Phải là file đầu tiên và không nén)
+                    // 1. Khởi tạo tệp mimetype (Yêu cầu bắt buộc: Phải là tập tin đầu tiên và không áp dụng cơ chế nén)
                     addMimeType(zos)
 
                     // 2. META-INF/container.xml
@@ -43,7 +43,7 @@ object EpubExporter {
 
     private fun addMimeType(zos: ZipOutputStream) {
         val bytes = "application/epub+zip".toByteArray()
-        // Fix: tính CRC32 động thay vì hardcode sai → EPUB hợp lệ với external readers
+        // Tích hợp thuật toán CRC32 động nhằm bảo đảm tính toàn vẹn của cấu trúc EPUB đối với các trình đọc ngoại vi (External Readers)
         val crc = java.util.zip.CRC32().apply { update(bytes) }.value
         val entry = ZipEntry("mimetype").apply {
             method = ZipEntry.STORED
@@ -119,7 +119,7 @@ object EpubExporter {
     private fun addChapterContent(zos: ZipOutputStream, chapter: Chapter, paragraphs: List<String>) {
         zos.putNextEntry(ZipEntry("OEBPS/chapter.xhtml"))
         
-        // Split nội dung theo dòng để tạo các thẻ <p> riêng biệt
+        // Phân tách khối nội dung văn bản theo từng dòng để khởi tạo các thẻ đoạn văn bản (<p>) độc lập
         val processedBody = paragraphs.flatMap { it.split("\n") }
             .filter { it.isNotBlank() }
             .joinToString("") { "<p>${it.trim().replace("&", "&amp;").replace("<", "&lt;")}</p>" }

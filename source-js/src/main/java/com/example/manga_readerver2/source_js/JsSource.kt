@@ -82,7 +82,7 @@ class JsSource(
         return when (element) {
             is JsonPrimitive -> element.content.takeIf { it.isNotBlank() } ?: ""
             is JsonObject -> {
-                // Ưu tiên fallback[0] (TruyenQQ dùng field này cho real URL)
+                // Ưu tiên sử dụng liên kết dự phòng đầu tiên (fallback[0]) làm URL chính cho hình ảnh
                 val fallback = element["fallback"] as? JsonArray
                 val fallbackUrl = fallback?.firstOrNull()?.let {
                     (it as? JsonPrimitive)?.content?.takeIf { url -> url.isNotBlank() }
@@ -159,7 +159,7 @@ class JsSource(
                 if (!parsedArtist.isNullOrBlank()) artist = parsedArtist
                 else if (artist.isNullOrBlank() && !parsedAuthor.isNullOrBlank()) artist = parsedAuthor
 
-                // description thường là HTML (ví dụ: "<p>...</p>") → phải strip
+                // Loại bỏ các thẻ HTML trong thuộc tính mô tả (description) để chuyển thành văn bản thuần túy
                 val rawDesc = data["description"]?.stringValue()
                 if (!rawDesc.isNullOrBlank()) description = stripHtml(rawDesc)
 
@@ -256,10 +256,10 @@ class JsSource(
         }
         val result = engine.execute(subScript, "execute", pageViewerUrl) ?: return null
 
-        // Sub-script có thể trả về:
-        //  (a) JSON format: {"data": "https://...", ...}
-        //  (b) Plain URL string: "https://..."
-        //  (c) null / empty → failed
+        // Định dạng dữ liệu trả về từ Sub-script: 
+        // (a) Cấu trúc JSON: {"data": "https://...", ...}
+        // (b) Chuỗi URL thuần túy: "https://..."
+        // (c) null/rỗng nếu thất bại
         val trimmed = result.trim()
         if (trimmed.isBlank() || trimmed == "null") return null
 
@@ -279,7 +279,7 @@ class JsSource(
                 else -> null
             }
         } catch (_: Exception) {
-            // Không phải JSON → treat as raw URL
+            // Xử lý dưới dạng URL thuần túy nếu không phải là định dạng JSON hợp lệ
             if (trimmed.startsWith("http")) trimmed else null
         }
     }
@@ -306,9 +306,7 @@ class JsSource(
 
             when {
                 // ── Case A: data là JsonArray ─────────────────────────────────
-                // VD: blogtruyen/mangadex → ["url1", "url2"] (plain string array)
-                // VD: nettruyen/truyenqq  → [{link:"url", fallback:["url2"]}]
-                // VD: e-hentai/cuutruyen  → [{link:"viewer_url", script:"img.js"}] (2-step)
+                // Hỗ trợ đa dạng cấu trúc mảng: Mảng chuỗi thuần (String Array), Mảng đối tượng chứa liên kết dự phòng (Fallback Links) và Mảng đối tượng tải dữ liệu qua 2 bước (2-Step Fetching)
                 dataElement is JsonArray -> {
                     logcat(LogPriority.DEBUG) { "[JsSource:$name] data is array, size=${dataElement.size}" }
                     if (dataElement.isEmpty()) return emptyList()
@@ -319,7 +317,7 @@ class JsSource(
                         && firstObj.containsKey("link")
 
                     if (hasScriptPattern) {
-                        // Two-step pattern: resolve từng page qua sub-script (parallel)
+                        // Kích hoạt tiến trình tải song song (parallel) thông qua sub-script
                         logcat(LogPriority.DEBUG) { "[JsSource:$name] Detected {link, script} pattern — resolving ${dataElement.size} pages in parallel" }
                         val deferreds = dataElement.mapIndexedNotNull { index, element ->
                             val obj = element as? JsonObject ?: return@mapIndexedNotNull null
@@ -357,8 +355,7 @@ class JsSource(
                 }
 
                 // ── Case B: data là JsonPrimitive (string) ────────────────────
-                // VD: Hako chap.js → trả về string HTML trực tiếp
-                // Có thể là: plain text, HTML text, HTML có <img> (light novel)
+                // Xử lý chuỗi văn bản trực tiếp (văn bản thuần túy, nội dung HTML hoặc HTML chứa ảnh - thường dùng cho tiểu thuyết)
                 dataElement is JsonPrimitive && dataElement.isString -> {
                     val content = dataElement.content
                     logcat(LogPriority.DEBUG) { "[JsSource:$name] data is string len=${content.length}" }
@@ -474,7 +471,7 @@ class JsSource(
                 var tabIndex = if (isLatest) 1 else 0
                 
                 if (isLatest) {
-                    // Tìm tab "Mới cập nhật" dựa trên title để tránh fix cứng index 1
+                    // Tự động phân loại luồng dữ liệu "Mới cập nhật" dựa trên tiêu đề thay vì sử dụng chỉ mục cố định
                     for (i in 0 until data.size) {
                         val tabObj = data[i] as? JsonObject ?: continue
                         val title = tabObj["title"]?.stringValue()?.lowercase() ?: tabObj["name"]?.stringValue()?.lowercase() ?: ""
@@ -513,7 +510,7 @@ class JsSource(
             
             // Nếu home.js trả về danh sách manga trực tiếp (không có tab)
             if (isLatest) {
-                // Trả về rỗng để tránh việc 2 tab hiện cùng 1 dữ liệu giống nhau
+                // Ngăn chặn tình trạng hiển thị dữ liệu trùng lặp giữa các luồng hiển thị
                 return MangasPage(emptyList(), false)
             }
 

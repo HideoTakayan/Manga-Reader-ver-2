@@ -156,7 +156,7 @@ class ExtensionRepoScreenModel(
         .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     suspend fun addRepo(url: String): Boolean {
-        // Chuẩn hóa URL
+        // Chuẩn hóa đường dẫn tài nguyên (URL Normalization)
         val baseUrl = url.removeSuffix("/")
             .removeSuffix("/index.min.json")
             .removeSuffix("/repo.json")
@@ -173,9 +173,9 @@ class ExtensionRepoScreenModel(
             )
             return true
         } else {
-            // Fallback nếu không lấy được repo.json nhưng vẫn thử thêm
-            // Ở đây Mihon thường yêu cầu repo.json phải tồn tại để lấy signing key
-            // Nhưng để linh hoạt chúng ta cho phép thêm và đặt tên theo URL
+            // Kích hoạt luồng xử lý dự phòng: Trực tiếp tích hợp kho lưu trữ trong trường hợp không thể trích xuất repo.json
+            // Theo chuẩn thông thường, repo.json là thành phần bắt buộc để xác thực chữ ký (Signing Key)
+            // Tuy nhiên, nhằm nâng cao tính linh hoạt, hệ thống vẫn chấp nhận khởi tạo trực tiếp dựa trên định danh URL
             repository.upsertRepo(
                 baseUrl = baseUrl,
                 name = baseUrl.substringAfterLast("/"),

@@ -39,8 +39,10 @@ object ExtensionLoader {
     private const val METADATA_SOURCE_CLASS = "tachiyomi.extension.class"
     private const val METADATA_SOURCE_FACTORY = "tachiyomi.extension.factory"
     private const val METADATA_NSFW = "tachiyomi.extension.nsfw"
+    // Trích xuất metadata 'tachiyomix.extensionLib' từ AndroidManifest để kiểm tra tính tương thích
+    private const val METADATA_EXTENSION_LIB = "tachiyomix.extensionLib"
     const val LIB_VERSION_MIN = 1.2  // Mở rộng xuống dưới để tương thích extension cũ
-    const val LIB_VERSION_MAX = 2.0  // Mở rộng lên trên để tương thích Mihon mới nhất
+    const val LIB_VERSION_MAX = 2.0  // Mở rộng giới hạn phiên bản tối đa để tăng cường khả năng tương thích ngược
 
     @Suppress("DEPRECATION")
     private val PACKAGE_FLAGS = PackageManager.GET_CONFIGURATIONS or
@@ -110,7 +112,14 @@ object ExtensionLoader {
             return LoadResult.Error(Exception("Missing versionName"))
         }
 
-        val libVersion = versionName.substringBeforeLast('.').toDoubleOrNull()
+        val metaData = appInfo.metaData ?: android.os.Bundle.EMPTY
+        // Ưu tiên đọc phiên bản thư viện mở rộng từ metadata.
+        // Trong trường hợp metadata không tồn tại, hệ thống sẽ sử dụng versionName làm phương án dự phòng.
+        // Điều này đảm bảo tính chính xác vì các extension có thể định dạng versionName dưới dạng chuỗi (ví dụ: "14.x.y"), trong khi libVersion luôn là số thực.
+        val libVersion = metaData.getFloat(METADATA_EXTENSION_LIB)
+            .takeUnless { it == 0.0f }
+            ?.toString()?.toDouble()
+            ?: versionName.substringBeforeLast('.').toDoubleOrNull()
         if (libVersion == null || libVersion < LIB_VERSION_MIN || libVersion > LIB_VERSION_MAX) {
             logcat(LogPriority.WARN) {
                 "[ExtensionLoader] SKIP $pkgName: libVersion=$libVersion vượt ngoài phạm vi $LIB_VERSION_MIN..$LIB_VERSION_MAX (versionName=$versionName)"
@@ -128,12 +137,11 @@ object ExtensionLoader {
             }
         }
         
-        // Bỏ hoàn toàn cơ chế Trust theo yêu cầu của user. Tất cả Extension đều được tự động load.
+        // Vô hiệu hóa cơ chế xác thực chứng chỉ (Trust). Toàn bộ Extension sẽ được tải tự động.
         // if (!trustExtension.isTrusted(pkgInfo, signatures) && !preferences.allowUntrustedExtensions.get() && !signatures.any { it in trustedSignatures }) { ... }
 
-        val metaData = appInfo.metaData ?: android.os.Bundle.EMPTY
         val isNsfw = metaData.getInt(METADATA_NSFW) == 1
-        // Bỏ kiểm tra NSFW, cho phép toàn bộ hiển thị
+        // Vô hiệu hóa bộ lọc nội dung nhạy cảm (NSFW), cho phép hiển thị tất cả các nguồn.
         // if (!loadNsfwSource && isNsfw) { ... }
 
         val classLoader = try {

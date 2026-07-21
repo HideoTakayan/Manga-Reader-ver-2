@@ -143,7 +143,7 @@ dependencies {
 
     // Conscrypt (Better TLS)
     implementation(libs.conscrypt)
-    // Subsampling (Mihon style)
+    // Subsampling (Tiêu chuẩn)
     implementation(libs.subsampling.scale.image.view)
 
     // Jsoup (HTML processing for EPUB)

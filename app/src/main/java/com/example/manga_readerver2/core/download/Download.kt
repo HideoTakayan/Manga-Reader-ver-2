@@ -56,7 +56,7 @@ class Download(
         NOT_DOWNLOADED(0),
         QUEUE(1),
         DOWNLOADING(2),
-        COMPRESSING(3), // Trạng thái nén thành CBZ/EPUB
+        COMPRESSING(3),
         DOWNLOADED(4),
         ERROR(5),
     }

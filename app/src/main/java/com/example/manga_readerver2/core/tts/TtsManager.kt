@@ -29,7 +29,7 @@ class TtsManager(private val context: Context) : TextToSpeech.OnInitListener {
     val currentParagraphIndex = _currentParagraphIndex.asStateFlow()
 
     private var currentParagraphs: List<String> = emptyList()
-    // Fix BUG-06: Lưu index trước khi stop() để resume đúng vị trí
+    // Cất giữ lại vị trí index hiện tại trước khi gọi hàm stop() nhằm hỗ trợ quá trình Resume diễn ra chính xác
     var pausedAtIndex: Int = -1
         private set
     
@@ -75,7 +75,7 @@ class TtsManager(private val context: Context) : TextToSpeech.OnInitListener {
                 val idx = utteranceId?.toIntOrNull() ?: -1
                 if (idx >= currentParagraphs.size - 1) {
                     _isPlaying.value = false
-                    // Fix BUG-07: Notify completion to trigger auto-next chapter
+                    // Phát tín hiệu hoàn tất (completion) để hệ thống tự động chuyển sang chương tiếp theo
                     kotlinx.coroutines.GlobalScope.launch {
                         _onComplete.emit(Unit)
                     }
@@ -90,7 +90,7 @@ class TtsManager(private val context: Context) : TextToSpeech.OnInitListener {
 
     fun speak(paragraphs: List<String>, startIndex: Int = 0) {
         if (tts == null) {
-            // Fix BUG-16: Re-initialize if previously released
+            // Khởi tạo lại hệ thống Text-to-Speech nếu trước đó đã bị giải phóng (released)
             reinitialize()
             return 
         }
@@ -115,8 +115,8 @@ class TtsManager(private val context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun pause() {
-        // Fix BUG-06: Lưu index trước khi stop() reset currentParagraphIndex
-        // (Android TTS không có API pause() thực sự, phải dùng stop() + resume thủ công)
+        // Ghi nhận lại vị trí index hiện tại do hàm stop() sẽ thiết lập lại currentParagraphIndex
+        // (Do Android TTS không cung cấp API pause() nguyên bản, ta phải mô phỏng lại thông qua stop() và resume())
         pausedAtIndex = _currentParagraphIndex.value.coerceAtLeast(0)
         tts?.stop()
         _isPlaying.value = false

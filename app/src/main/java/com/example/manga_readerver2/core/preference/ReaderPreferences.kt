@@ -51,7 +51,7 @@ class ReaderPreferences(preferenceStore: PreferenceStore) {
     val customColorFilterAlpha = preferenceStore.getFloat("custom_color_filter_alpha", 0.2f)
     val customColorFilterBlendMode = preferenceStore.getInt("custom_color_filter_blend_mode", 0) // 0: Multiply, 1: Screen, 2: Overlay
     
-    // Advanced Image Filters (Mihon-style)
+    // Advanced Image Filters 
     val invertColors = preferenceStore.getBoolean("invert_colors", false)
     val grayscale = preferenceStore.getBoolean("grayscale", false)
     

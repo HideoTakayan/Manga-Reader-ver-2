@@ -104,7 +104,7 @@ class HistoryScreenModel : ScreenModel {
             val manga = repository.getMangaById(mangaId)
             emit(manga?.favorite == true)
         }.flatMapLatest {
-            // Lắng nghe thư viện để cập nhật real-time
+            // Khởi tạo luồng quan sát bộ sưu tập nhằm đồng bộ dữ liệu thời gian thực (Real-time tracking)
             repository.getFavorites().map { favList ->
                 favList.any { it.id == mangaId }
             }

@@ -17,7 +17,7 @@ object HtmlParser {
      * Input: HTML string (có thể là raw HTML hoặc plain text)
      */
     fun parseToBlocks(html: String, baseUri: String = ""): List<ReaderBlock> {
-        // Nếu input là plain text (không có tag HTML) thì trả về trực tiếp
+        // Trả về trực tiếp văn bản thuần túy (plain text) nếu không phát hiện các thẻ HTML
         if (!html.contains('<')) {
             return html.split("\n")
                 .map { it.trim() }
@@ -51,7 +51,7 @@ object HtmlParser {
         
         fun traverse(node: Node) {
             when {
-                // Thẻ img → Image block
+                // Khởi tạo khối hình ảnh từ thẻ img
                 node is Element && node.tagName() == "img" -> {
                     flushText()
                     val src = getImageUrl(node)
@@ -60,16 +60,16 @@ object HtmlParser {
                         blocks.add(ReaderBlock.Image(src, alt))
                     }
                 }
-                // Thẻ br → ngắt đoạn
-                node is Element && node.tagName() == "br" -> {
-                    // Đánh dấu ngắt dòng bằng \n trong buffer
+                // Nhận diện thẻ br để xử lý ngắt đoạn
+                node.nodeName() == "br" -> {
+                    // Đánh dấu ký tự ngắt dòng (\n) vào bộ đệm văn bản
                     currentText.append("\n")
                 }
-                // Text node → thu thập text
+                // Phân tích và thu thập nội dung từ Text Node
                 node is TextNode -> {
                     currentText.append(node.wholeText)
                 }
-                // Element khác
+                // Xử lý đệ quy các thẻ con khác
                 node is Element -> {
                     val isBlock = node.isBlock
                     if (isBlock) flushText()

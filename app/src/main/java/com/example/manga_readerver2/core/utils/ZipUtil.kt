@@ -11,7 +11,7 @@ import java.util.zip.ZipOutputStream
 object ZipUtil {
     
     /**
-     * Nén một thư mục chứa ảnh thành file .cbz chuẩn Mihon.
+     * Nén một thư mục chứa ảnh thành file .cbz tiêu chuẩn.
      * @param sourceDir Thư mục chứa các file ảnh đã tải.
      * @param destFile File đích (thường là .cbz).
      * @param deleteSource Xóa thư mục nguồn sau khi nén thành công.
@@ -23,7 +23,7 @@ object ZipUtil {
         val files = sourceDir.listFiles() ?: return false
         if (files.isEmpty()) return false
 
-        // Đảm bảo thư mục đích tồn tại
+        // Xác thực quá trình khởi tạo cấu trúc thư mục đích
         destFile.parentFile?.mkdirs()
 
         try {
@@ -54,7 +54,7 @@ object ZipUtil {
             return true
         } catch (e: Exception) {
             e.printStackTrace()
-            // Xóa file lỗi nếu có
+            // Thực thi cơ chế thu hồi (Rollback): Xóa bỏ các tập tin bị lỗi trong quá trình xử lý
             if (destFile.exists()) destFile.delete()
             return false
         }
